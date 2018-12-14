@@ -111,9 +111,10 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\Program Files (x86)\Neurotechnology\Neurotec Biometric 10.0 SDK\Lib\Win64_x64;../ThirdParty;C:\opencv\build\x64\vc15\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>opencv_world343d.lib;NBiometricClient.dll.lib;NBiometrics.dll.lib;NDevices.dll.lib;NMedia.dll.lib;NCore.dll.lib;NLicensing.dll.lib;J2C_Iris_SDK.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy $(OutDir)J2CEngine.dll c:\jtwoc\dll /Y</Command>
+      <Command>xcopy $(OutDir)J2CEngine.dll ..\..\bin /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
