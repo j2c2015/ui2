@@ -1,0 +1,6 @@
+#include "multicorequeuetemplate.h"
+
+EnrollMultiCoreQueue   gEnrollMultiCoreQueue;
+EyeSelectMultiCoreQueue gEyeSelectMultiCoreQueue;
+EnrollMultiCoreQueue   gIdentifyMultiCoreQueue;
+NeuroMultiCoreQueue	gNeuroMultiCoreQueue;

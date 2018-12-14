@@ -1,0 +1,69 @@
+#ifndef _USBCOMMON_H_
+#define _USBCOMMON_H_
+
+#define MAX_GPIO_DATA_SIZE	(256)
+#define MAX_I2C_DATA_SIZE	(256)
+
+#define CAPSTR_OFF			(0)
+#define CAPSTR_ON			(1)
+#define CAPSTR_BLINKINGLED	(2)
+
+// internal GPIO Definites
+#define GPIO_850			(21)
+#define GPIO_730			(22)
+
+// RequestType
+#define HAJESOFT_USB_SET_REQTYPE    (uint8_t)(0x41)
+#define HAJESOFT_USB_GET_REQTYPE    (uint8_t)(0xC1)
+
+// 이미지의 첫번째 픽셀 한바이트의 의미를 파악하는 용도로 사용됨
+#define FRAMETOGGLE		(0x80) // bit 7
+#define LEDON_FRAME		(0x40) // bit 6
+
+// Control Code
+#define IOCTL_SET_REMOVE_EVENT	CTL_CODE( FILE_DEVICE_UNKNOWN, 0x900, METHOD_BUFFERED, FILE_READ_DATA | FILE_WRITE_DATA )
+
+#define IOCTL_SET_REQUEST	CTL_CODE( FILE_DEVICE_UNKNOWN, 0x901, METHOD_BUFFERED, FILE_READ_DATA | FILE_WRITE_DATA )
+#define IOCTL_GET_REQUEST	CTL_CODE( FILE_DEVICE_UNKNOWN, 0x902, METHOD_BUFFERED, FILE_READ_DATA | FILE_WRITE_DATA )
+#define IOCTL_INITIALIZE	CTL_CODE( FILE_DEVICE_UNKNOWN, 0x903, METHOD_BUFFERED, FILE_READ_DATA | FILE_WRITE_DATA )
+#define IOCTL_START			CTL_CODE( FILE_DEVICE_UNKNOWN, 0x904, METHOD_BUFFERED, FILE_READ_DATA | FILE_WRITE_DATA )
+#define IOCTL_STOP			CTL_CODE( FILE_DEVICE_UNKNOWN, 0x905, METHOD_BUFFERED, FILE_READ_DATA | FILE_WRITE_DATA )
+#define IOCTL_CAPTURE		CTL_CODE( FILE_DEVICE_UNKNOWN, 0x906, METHOD_BUFFERED, FILE_READ_DATA | FILE_WRITE_DATA )
+
+#define ADDI2C_CAM		(0x5A)
+#define ADDI2C_IRLED	(0x64)
+
+// USB Setup Request
+#define REQ_SETSIMPLEGPIO	(0x01)
+#define REQ_GETSIMPLEGPIO	(0x81)
+#define REQ_SETCOMPLEXGPIO	(0x02)
+#define REQ_SETI2C			(0x03)
+#define REQ_GETI2C			(0x83)
+#define REQ_INITCAM			(0x04)
+#define REQ_START			(0x05)
+#define REQ_STOP			(0x06)
+#define REQ_CAPTURE			(0x07)
+
+#pragma pack(1)
+typedef struct _USB_REQUEST_t
+{
+	unsigned short	Length;
+	unsigned char	Request;
+	unsigned short	Value;
+	unsigned short	Index;
+}USB_REQUEST, *PUSB_REQUEST;
+
+typedef struct _USB_SETREQUEST_t
+{
+	USB_REQUEST		UsbRequest;
+	unsigned char	Data[1];
+}USB_SETREQUEST, *PUSB_SETREQUEST;
+
+typedef struct _USB_GETREQUEST_t
+{
+	USB_REQUEST		UsbRequest;
+}USB_GETREQUEST, *PUSB_GETREQUEST;
+
+#pragma pack()
+
+#endif //_USBCOMMON_H_
