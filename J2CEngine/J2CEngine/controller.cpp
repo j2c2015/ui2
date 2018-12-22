@@ -1023,3 +1023,267 @@ float Controller::CalculateDistance(unsigned char* src, RECT& rtROI, int nExclud
 	}
 	return fStdDeviationSum;
 }
+
+void Controller::CallEyeFindTestFile(char* pszFilePath)
+{
+	if (access(pszFilePath, 0) != 0)
+		return;
+
+	int cchDestChar = strlen((LPCSTR)pszFilePath) + 1;
+	TCHAR wszDestPath[_MAX_PATH] = _T("");
+	MultiByteToWideChar(CP_ACP, 0, (LPCSTR)pszFilePath, -1, wszDestPath, cchDestChar - 1);
+
+	FUNCTION_NAME_IS(_T("Controller::CallEyeFindTestFile"));
+	LOG_PRINTF(0, _T("Calling [EyeFind] File: %s"), wszDestPath);
+
+	cv::Mat image = cv::imread(pszFilePath, IMREAD_GRAYSCALE);
+	unsigned char* src = image.data;
+	if (src)
+	{
+		char szFName[_MAX_FNAME] = "";
+		char* pszFName = NULL;
+		_splitpath(pszFilePath, NULL, NULL, szFName, NULL);
+		if (strlen(szFName) > 0)
+		{
+			pszFName = szFName;
+			char* pch = strrchr(szFName, '_');
+			if (pch)
+			{
+				pszFName = pch + 1;
+			}
+		}
+
+		CallEyeFindTest(src, pszFName);
+	}
+}
+
+void Controller::CallEyeFindTest(unsigned char* src, char* pszName)
+{
+	int ScanHeight = GetEyeFindScanHeight();
+	int ScanWidth = GetEyeFindScanWidth();
+	int rowStart = (HEIGHT_FOR_CAMERA_CROP - ScanHeight) / 2;
+	int colStart = (WIDTH_FOR_CAMERA_CROP - ScanWidth) / 2;
+	int threshold = GetEyeFindScanThreshold();
+	int resultAdded = GetEyeFindScanResultAdded();
+	int areaMin = GetEyeFindScanAreaMin();
+	int areaMax = GetEyeFindScanAreaMax();
+	int lineMin = GetEyeFindScanLineMin();
+	int lineMax = GetEyeFindScanLineMax();
+	int ratioMin = GetEyeFindScanRatioMin();
+	bool bSaveMask = GetEyeFindScanSaveMask();
+	bool bSaveSpecular = GetEyeFindScanSaveSpecular();
+	bool bTimeLogging = GetEyeFindScanTimeLogging();
+	int nRowFindStart = GetEyeFindScanTopIdx();
+	int nRowFindEnd = GetEyeFindScanBottomIdx();
+	int nColFindStart = GetEyeFindScanLeftIdx();
+	int nColFindEnd = GetEyeFindScanRightIdx();
+	bool bCheckCond = GetEyeFindScanCheckCond();
+	bool bDistTimeLogging = GetEyeDistTimeLogging();
+	int nDistExcludeThreshold = GetEyeDistExcludeThreshold();
+	bool bSaveDist = GetEyeDistSaveImage();
+
+	int checkInterval = GetEyeFindScanCheckInterval();
+	CEllapsedTime timeFind;
+
+	SharedBuffer bufMask = getBufferPoolManager().getBuffer(MASK_CROP_BUFFER_POOL_ID);
+	SharedBuffer bufTest = getBufferPoolManager().getBuffer(MASK_TEST_BUFFER_POOL_ID);
+	gFindSpecularIdx++;
+	if (gFindSpecularIdx == checkInterval)
+	{
+		gFindSpecularIdx = 0;
+		vecRoiSP.clear();
+	}
+
+	if (bufMask != nullptr && gFindSpecularIdx == 0)
+	{
+		unsigned char* dest = (unsigned char*)bufMask->getBuffer();
+		memset(dest, 0x00, FRAMESIZE_FOR_MASK_CROP);
+
+		int nRowStart = 1;
+		int nRowEnd = HEIGHT_FOR_CAMERA_CROP - 1;
+		int nColStart = 1;
+		int nColEnd = WIDTH_FOR_CAMERA_CROP - 1;
+		int nBaseValue = getController().MaskingChunkFromBuf(src, dest, nRowStart, nRowEnd, nColStart, nColEnd, threshold, bTimeLogging);
+		if (nBaseValue > 1)
+		{
+			//
+		}
+
+		int nRoiCount = getController().FindSpecularCross(dest, nRowFindStart, nRowFindEnd, nColFindStart, nColFindEnd, nBaseValue, &vecRoiSP, resultAdded, bCheckCond, bTimeLogging);
+		if (nRoiCount > 0)
+		{
+			bool bFindEye = false;
+			if (nRoiCount == 1)
+				bFindEye = true;
+
+			if (bFindEye)
+			{
+				RECT rtROI = vecRoiSP.at(0);
+
+				// save mask
+				if (bSaveMask)
+				{
+					unsigned char* test = (unsigned char*)bufTest->getBuffer();
+					memset(test, 0x00, FRAMESIZE_FOR_MASK_TEST);
+					for (int row = 0; row < HEIGHT_FOR_CAMERA_CROP; row++)
+					{
+						for (int col = 0; col < WIDTH_FOR_CAMERA_CROP; col++)
+						{
+							int nIdxPixel = ((row * WIDTH_FOR_CAMERA_CROP) + col);
+							unsigned char value = dest[nIdxPixel];
+							if (value >= nBaseValue)
+								value = 255;
+							test[nIdxPixel] = value;
+						}
+					}
+					Mat _srcTest = cv::Mat(cvSize(WIDTH_FOR_CAMERA_CROP, HEIGHT_FOR_CAMERA_CROP), CV_8UC1, test, cv::Mat::AUTO_STEP);
+					char pathTest[256] = { 0, };
+					sprintf(pathTest, "c:\\jtwoc\\eyetest\\test_mask_%s.png", pszName);
+					imwrite(pathTest, _srcTest);
+				}
+				// save specular display
+				if (bSaveSpecular)
+				{
+					cv::Rect roiSP;
+					roiSP.x = rtROI.left;
+					roiSP.y = rtROI.top;
+					roiSP.width = (rtROI.right - rtROI.left);
+					roiSP.height = (rtROI.bottom - rtROI.top);
+					Mat _srcSP = cv::Mat(cvSize(WIDTH_FOR_CAMERA_CROP, HEIGHT_FOR_CAMERA_CROP), CV_8UC1, src, cv::Mat::AUTO_STEP);
+					Mat srcSP;
+					cvtColor(_srcSP, srcSP, cv::COLOR_GRAY2BGR);
+					rectangle(srcSP, roiSP, Scalar(255, 0, 255), 1);
+					char pathSP[256] = { 0, };
+					sprintf(pathSP, "c:\\jtwoc\\eyetest\\test_specular_%s.png", pszName);
+					imwrite(pathSP, srcSP);
+				}
+				// calculate distance
+				float fDeviation = getController().CalculateDistance(src, rtROI, nDistExcludeThreshold, bSaveDist, pszName, bDistTimeLogging);
+			}
+		}
+
+		/*
+		//
+		// find specular
+		//
+		std::vector<RECT> vecRoiAll;
+
+		//int* test = (int*)bufTest->getBuffer();
+		//memset(test, 0x00, FRAMESIZE_FOR_CAMERA_CROP);
+
+		int nCheckValue = 0;
+		int nRecurseCnt = 0;
+		int nPixelCnt = 0;
+		for (int row = (rowStart + 1); row < (HEIGHT_FOR_CAMERA_CROP - rowStart - 1); row++)
+		{
+		for (int col = (colStart + 1); col < (WIDTH_FOR_CAMERA_CROP - colStart - 1); col++)
+		{
+		nCheckValue++;
+
+		if (vecRoiAll.size() > 0)
+		{
+		bool bExistPos = false;
+		for (auto &&roi : vecRoiAll)
+		{
+		RECT rt = roi;
+		rt.left -= 1;
+		rt.top -= 1;
+		rt.right += 1;
+		rt.bottom += 1;
+		POINT pt = { col, row };
+		if (::PtInRect(&rt, pt))
+		{
+		bExistPos = true;
+		col = rt.right;
+		break;
+		}
+		}
+		if (bExistPos)
+		{
+		continue;
+		}
+		}
+
+		//
+		// find specular
+		//
+		nRecurseCnt = 0;
+		nPixelCnt = 0;
+		RECT rtSP = { 0, };
+		getController().FindSpecular(dest, row, col, threshold, rtSP, nPixelCnt);
+		//getController().FindSpecularRecurse(dest, row, col, threshold, test, rtSP, nCheckValue, nPixelCnt, nRecurseCnt);
+		if (::IsRectEmpty(&rtSP) == FALSE)
+		{
+		vecRoiAll.push_back(rtSP);
+
+		int width = rtSP.right - rtSP.left;
+		int height = rtSP.bottom - rtSP.top;
+		int area = (width * height);
+		float ratio = 0.0f;
+		if (width > height)
+		{
+		ratio = ((float)height / (float)width);
+		}
+		else
+		{
+		ratio = ((float)width / (float)height);
+		}
+		ratio *= 100;
+
+		if ((width > lineMin && height > lineMin) &&
+		(width < lineMax && height < lineMax) &&
+		(area > areaMin && area < areaMax) &&
+		(ratio >= ratioMin))
+		{
+		bool bIntersect = false;
+		if (vecRoiSP.size() > 0)
+		{
+		std::vector<RECT>::iterator iVec = vecRoiSP.begin();
+		for ( ; iVec != vecRoiSP.end(); iVec++)
+		{
+		RECT roi = *iVec;
+		RECT rtIntersect = { 0, };
+		if (::IntersectRect(&rtIntersect, &roi, &rtSP))
+		{
+		::UnionRect(&rtIntersect, &roi, &rtSP);
+		vecRoiSP.erase(iVec);
+		vecRoiSP.push_back(rtIntersect);
+		bIntersect = true;
+		break;
+		}
+		}
+		}
+		if (!bIntersect)
+		{
+		vecRoiSP.push_back(rtSP);
+		}
+		}
+		}
+		}
+		}
+		*/
+
+		if (vecRoiSP.size() > 0)
+		{
+			//FUNCTION_NAME_IS(_T("Scaler::__internalJob"));
+			//LOG_PRINTF(0, _T("[EyeFind] Finished finding specular. (Time= %0.5f)"), fTimeSpecular);
+			/*
+			char path[256] = "";
+			sprintf(path, "c:\\jtwoc\\crop\\crop_roi_%s.png", buf->getName());
+			char szFName[256] = "";
+			sprintf(szFName, "crop_%s.png", buf->getName());
+			std::string strPath = path;
+			getImageSaver().saveGrayImage(buf, strPath, WIDTH_FOR_CAMERA_CROP, HEIGHT_FOR_CAMERA_CROP);
+			*/
+			/*
+			for (auto &&roi : vecRoiSP)
+			{
+			drawSpecular(forDisplay, roi);
+			LOG_PRINTF(0, _T("[EyeFind] Resulting specular. (Name= %d) [Pos: %d,%d,%d,%d]"), atoi(buf->getName()), roi.x, roi.y, roi.x + roi.width, roi.y + roi.height);
+			}
+			*/
+		}
+		bufMask = nullptr;
+		bufTest = nullptr;
+	}
+}

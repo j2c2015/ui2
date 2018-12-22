@@ -98,3 +98,8 @@ J2CEngineDLL_API void J2CLogInit(void* hInstance)
 	g_hInstApp = (HINSTANCE)hInstance;
 	LOG_INIT((HANDLE)hInstance);
 }
+
+J2CEngineDLL_API void J2CEyeFindTest(char* pszFilePath)
+{
+	getController().CallEyeFindTestFile(pszFilePath);
+}

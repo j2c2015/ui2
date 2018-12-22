@@ -36,4 +36,4 @@ J2CEngineDLL_API void setNeuroWorkDirectory(char *directory);
 J2CEngineDLL_API void setEnrollCount(int count);
 J2CEngineDLL_API void partialRender(int x,int y, J2CRenderCb cb);
 J2CEngineDLL_API void J2CLogInit(void* hInstance);
-
+J2CEngineDLL_API void J2CEyeFindTest(char* pszFilePath);

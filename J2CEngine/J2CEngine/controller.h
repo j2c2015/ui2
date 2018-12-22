@@ -455,6 +455,8 @@ public:
 	bool CheckSpecularCond(RECT* pRt, bool bCondLogging = false);
 	float CalculateDistance(unsigned char* src, RECT& rtROI, int nExcludeThreshold, bool bSaveDist, char* pszName, bool bTimeLogging = false);
 	void CopyRoiValueToClipboard(unsigned char** copyValue, int row, int col, bool bTimeLogging = false);
+	void CallEyeFindTest(unsigned char* src, char* pszName);
+	void CallEyeFindTestFile(char* pszFilePath);
 	/////////////////////////////////////////////////////////////////////////////
 };
 
