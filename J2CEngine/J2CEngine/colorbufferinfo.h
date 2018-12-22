@@ -4,6 +4,19 @@
 
 typedef enum { COLOR_BUFFER_LUMINANCE, COLOR_BUFFER_RGBA, COLOR_BUFFER_BGRA, COLOR_BUFFER_BGR } ColorBufferType;
 
+/////////////////////////////////////////////////////////////////////////////
+//
+// cscho (2018-12.20)
+//
+#define WIDTH_FOR_CAMERA_CROP		(800)
+#define HEIGHT_FOR_CAMERA_CROP		(600)
+#define COLOR_DEPTH_FOR_CAMERA_CROP	(1)
+#define FRAMESIZE_FOR_CAMERA_CROP	(WIDTH_FOR_CAMERA_CROP * HEIGHT_FOR_CAMERA_CROP * COLOR_DEPTH_FOR_CAMERA_CROP)
+#define MASK_CROP_BUFFER_POOL_ID	(101)
+#define FRAMESIZE_FOR_MASK_CROP		(WIDTH_FOR_CAMERA_CROP * HEIGHT_FOR_CAMERA_CROP * 1)
+#define MASK_TEST_BUFFER_POOL_ID	(102)
+#define FRAMESIZE_FOR_MASK_TEST		(WIDTH_FOR_CAMERA_CROP * HEIGHT_FOR_CAMERA_CROP * 1)
+/////////////////////////////////////////////////////////////////////////////
 
 #define WIDTH_FOR_CAMERA_CROP 800
 #define HEIGHT_FOR_CAMERA_CROP 600

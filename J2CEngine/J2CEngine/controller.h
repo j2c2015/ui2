@@ -4,10 +4,22 @@
 #include "J2CEngine_dll.h"
 #include <windows.h>
 #include "NeuroTask.h"
+#include <opencv/cv.h>
 
 #define DEVICE_ID_LEN 10
 #define PARITAL_WIDTH	64
 #define PARTIAL_HEIGHT	64
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// cscho (2018-12.20)
+//
+extern HINSTANCE g_hInstApp;
+static inline HINSTANCE& getCtrlInstance()
+{
+	return g_hInstApp;
+}
+/////////////////////////////////////////////////////////////////////////////
 
 enum Usage { IDLE_USAGE, ENROLL_USAGE, IDENTIFY_USAGE };
 class Controller {
@@ -39,6 +51,13 @@ public:
 	/***************   API ***************/
 	void initEngine(int nPartialWidth, int nPartialHeight)
 	{
+		/////////////////////////////////////////////////////////////////////////////
+		//
+		// cscho (2018-12.20)
+		//
+		LoadConfiguration();
+		/////////////////////////////////////////////////////////////////////////////
+
 		initBufferPoolManager();
 		initComponents();
 		initCamera();
@@ -366,6 +385,77 @@ public:
 	{
 		return m_nPartialHeight;
 	}
+
+	/////////////////////////////////////////////////////////////////////////////
+	//
+	// cscho (2018-12.20)
+	//
+	TCHAR m_szAppPath[_MAX_PATH];
+	TCHAR m_szAppName[_MAX_PATH];
+	TCHAR m_szConfPath[_MAX_PATH];
+	TCHAR* GetAppPath() { return m_szAppPath; }
+	TCHAR* GetAppName() { return m_szAppName; }
+	TCHAR* GetConfPath() { return m_szConfPath; }
+	int m_nEyeFindScanWidth;
+	int m_nEyeFindScanHeight;
+	int m_nEyeFindThreshold;
+	int m_nEyeFindAreaMin;
+	int m_nEyeFindAreaMax;
+	int GetEyeFindScanWidth() { return m_nEyeFindScanWidth; }
+	int GetEyeFindScanHeight() { return m_nEyeFindScanHeight; }
+	int GetEyeFindScanThreshold() { return m_nEyeFindThreshold; }
+	int GetEyeFindScanAreaMin() { return m_nEyeFindAreaMin; }
+	int GetEyeFindScanAreaMax() { return m_nEyeFindAreaMax; }
+	int m_nEyeFindResultAdded;
+	int GetEyeFindScanResultAdded() { return m_nEyeFindResultAdded; }
+	int m_nEyeFindScanBaseValue;
+	int GetEyeFindScanBaseValue() { return m_nEyeFindScanBaseValue; }
+	int m_nEyeFindLineMin;
+	int m_nEyeFindLineMax;	
+	int GetEyeFindScanLineMin() { return m_nEyeFindLineMin; }
+	int GetEyeFindScanLineMax() { return m_nEyeFindLineMax; }
+	int m_nEyeFindRatioMin;
+	int GetEyeFindScanRatioMin() { return m_nEyeFindRatioMin; }
+	int m_nEyeFindCheckInterval;
+	int GetEyeFindScanCheckInterval() { return m_nEyeFindCheckInterval; }
+	bool m_bEyeFindTimeLogging;
+	bool GetEyeFindScanTimeLogging() { return m_bEyeFindTimeLogging; }
+	bool m_bEyeFindCondLogging;
+	bool GetEyeFindScanCondLogging() { return m_bEyeFindCondLogging; }
+	bool m_bEyeFindCheckCond;
+	bool GetEyeFindScanCheckCond() { return m_bEyeFindCheckCond; }
+	bool m_bEyeFindSaveMask;
+	bool GetEyeFindScanSaveMask() { return m_bEyeFindSaveMask; }
+	bool m_bEyeFindSaveSpecular;
+	bool GetEyeFindScanSaveSpecular() { return m_bEyeFindSaveSpecular; }
+	int m_nEyeDistRoiDimension;
+	int GetEyeDistRoiDimension() { return m_nEyeDistRoiDimension; }
+	int m_nEyeDistRoiSample;
+	int GetEyeDistRoiSample() { return m_nEyeDistRoiSample; }
+	bool m_bEyeDistTimeLogging;
+	bool GetEyeDistTimeLogging() { return m_bEyeDistTimeLogging; }
+	int m_nEyeDistExcludeThreshold;
+	int GetEyeDistExcludeThreshold() { return m_nEyeDistExcludeThreshold; }
+	bool m_bEyeDistSaveImg;
+	bool GetEyeDistSaveImage() { return m_bEyeDistSaveImg; }
+	int m_nEyeFindScanLeftIdx;
+	int m_nEyeFindScanTopIdx;
+	int m_nEyeFindScanRightIdx;
+	int m_nEyeFindScanBottomIdx;
+	int GetEyeFindScanLeftIdx() { return m_nEyeFindScanLeftIdx; }
+	int GetEyeFindScanTopIdx() { return m_nEyeFindScanTopIdx; }
+	int GetEyeFindScanRightIdx() { return m_nEyeFindScanRightIdx; }
+	int GetEyeFindScanBottomIdx() { return m_nEyeFindScanBottomIdx; }
+	void LoadConfiguration();
+	void FindSpecularRecurse(unsigned char* dest, int row, int col, unsigned char nThreshold, int* bufTest, cv::Rect& rtRet, int nCheckValue, int& nPixelCnt, int& nRecurseCnt);
+	void FindSpecular(unsigned char* dest, int row, int col, unsigned char nThreshold, RECT& rtRet, int& nPixelCnt);
+	void UpdateRoiRect(RECT& rtRet, int row, int col, int& nPixelCnt);
+	int MaskingChunkFromBuf(unsigned char* pBufSrc, unsigned char* pBufDest, int nRowStart, int nRowEnd, int nColStart, int nColEnd, int nThreshold, bool bTimeLogging = false);
+	int FindSpecularCross(unsigned char* dest, int nRowFindStart, int nRowFindEnd, int nColFindStart, int nColFindEnd, int nBaseValue, std::vector<RECT>* pVecRoiSP, int nResultAdded, bool bCheckCond, bool bTimeLogging = false);
+	bool CheckSpecularCond(RECT* pRt, bool bCondLogging = false);
+	float CalculateDistance(unsigned char* src, RECT& rtROI, int nExcludeThreshold, bool bSaveDist, char* pszName, bool bTimeLogging = false);
+	void CopyRoiValueToClipboard(unsigned char** copyValue, int row, int col, bool bTimeLogging = false);
+	/////////////////////////////////////////////////////////////////////////////
 };
 
 extern Controller gController;
@@ -373,3 +463,6 @@ static inline Controller &getController()
 {
 	return gController;
 }
+
+extern int gFindSpecularIdx;
+extern std::vector<RECT> vecRoiSP;

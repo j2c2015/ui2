@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <windows.h>
@@ -36,3 +38,23 @@ void LOG_PRINTF(TCHAR _nLogLevel, TCHAR* pszFormat, ...);
 
 void CheckDeleteLog();
 void DeleteOldLog(long lCurDate, TCHAR* pszFName, int nPos);
+
+#pragma pack(push, 1)
+class CEllapsedTime
+{
+public:
+	CEllapsedTime();
+	virtual ~CEllapsedTime();
+
+protected:
+	LARGE_INTEGER	m_liFrequency;
+	LARGE_INTEGER	m_liCounter1;
+	LARGE_INTEGER	m_liCounter2;
+	double			m_fEllapsedTime;
+
+public:
+	void			StartEllapsedTime();
+	double			EndEllapsedTime();
+	double			GetEllapsedTime() { return m_fEllapsedTime; }
+};
+#pragma pack(pop)

@@ -95,5 +95,6 @@ J2CEngineDLL_API void partialRender(int x, int y, J2CRenderCb cb)
 
 J2CEngineDLL_API void J2CLogInit(void* hInstance)
 {
+	g_hInstApp = (HINSTANCE)hInstance;
 	LOG_INIT((HANDLE)hInstance);
 }

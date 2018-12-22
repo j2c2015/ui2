@@ -16,7 +16,7 @@ ImageSaver::ImageSaver()
 void ImageSaver::saveToFile(ImageSaveParam &param)
 {
 	if (param.format == GRAY) {
-		cv::Mat image = cv::Mat(cvSize(param.width, param.height), CV_8UC1, param.buffer->getBuffer(), cv::Mat::AUTO_STEP);
+		cv::Mat image = cv::Mat(cvSize(param.width, param.height), CV_8UC1, param.buffer->getBuffer(), cv::Mat::AUTO_STEP);		
 		cv::imwrite(param.filename, image);
 	}
 	else if (param.format == RGB) {
