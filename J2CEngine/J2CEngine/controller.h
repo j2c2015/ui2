@@ -198,7 +198,10 @@ public:
 		++currentEnrollCount_;
 		enrollUnBlock();
 		if (currentEnrollCount_ < enrollCount_)
+		{
+			int a = 0;
 			return;
+		}
 
 		enrollCb_(success);
 		enrollDone_ = true;
@@ -416,6 +419,8 @@ public:
 	int GetEyeFindScanLineMax() { return m_nEyeFindLineMax; }
 	int m_nEyeFindRatioMin;
 	int GetEyeFindScanRatioMin() { return m_nEyeFindRatioMin; }
+	bool m_bEyeFindUseOpenCV;
+	bool GetEyeFindUseOpenCV() { return m_bEyeFindUseOpenCV; }
 	int m_nEyeFindCheckInterval;
 	int GetEyeFindScanCheckInterval() { return m_nEyeFindCheckInterval; }
 	bool m_bEyeFindTimeLogging;
@@ -450,12 +455,12 @@ public:
 	void FindSpecularRecurse(unsigned char* dest, int row, int col, unsigned char nThreshold, int* bufTest, cv::Rect& rtRet, int nCheckValue, int& nPixelCnt, int& nRecurseCnt);
 	void FindSpecular(unsigned char* dest, int row, int col, unsigned char nThreshold, RECT& rtRet, int& nPixelCnt);
 	void UpdateRoiRect(RECT& rtRet, int row, int col, int& nPixelCnt);
-	int MaskingChunkFromBuf(unsigned char* pBufSrc, unsigned char* pBufDest, int nRowStart, int nRowEnd, int nColStart, int nColEnd, int nThreshold, bool bTimeLogging = false);
-	int FindSpecularCross(unsigned char* dest, int nRowFindStart, int nRowFindEnd, int nColFindStart, int nColFindEnd, int nBaseValue, std::vector<RECT>* pVecRoiSP, int nResultAdded, bool bCheckCond, bool bTimeLogging = false);
+	int MaskingChunkFromBuf(unsigned char* pBufSrc, unsigned char* pBufDest, int nRowStart, int nRowEnd, int nColStart, int nColEnd, int nThreshold, int nPixelContrast, int& nCntAll, int& nCntUpSide, int& nCntDnSide, bool bTimeLogging = false);
+	int FindSpecularCross(unsigned char* dest, int nRowFindStart, int nRowFindEnd, int nColFindStart, int nColFindEnd, int nBaseValue, std::vector<RECT>* pVecRoiSP, std::vector<RECT>* pVecRoiSPNot, int nResultAdded, bool bCheckCond, bool bTimeLogging = false);
 	bool CheckSpecularCond(RECT* pRt, bool bCondLogging = false);
-	float CalculateDistance(unsigned char* src, RECT& rtROI, int nExcludeThreshold, bool bSaveDist, char* pszName, bool bTimeLogging = false);
+	float CalculateDistance(unsigned char* src, RECT& rtROI, int nExcludeThreshold, bool bSaveDist, char* pszName, int nBaseValue, int nPixelContrast, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, bool bTimeLogging = false);
 	void CopyRoiValueToClipboard(unsigned char** copyValue, int row, int col, bool bTimeLogging = false);
-	void CallEyeFindTest(unsigned char* src, char* pszName);
+	void CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn);
 	void CallEyeFindTestFile(char* pszFilePath);
 	/////////////////////////////////////////////////////////////////////////////
 };
@@ -468,3 +473,5 @@ static inline Controller &getController()
 
 extern int gFindSpecularIdx;
 extern std::vector<RECT> vecRoiSP;
+extern std::vector<RECT> vecRoiSPNot;
+extern int gEnrollIdx;

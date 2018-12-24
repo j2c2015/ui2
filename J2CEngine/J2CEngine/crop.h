@@ -57,8 +57,8 @@ public:
 			//saveCropImage(buf);
 			getMultiCoreQueueForScaler().putSharedBuffer(buf);
 
-			if (getController().isEnrollUsage() != true && getController().isIdentifyUsage() != true) {
-
+			if (getController().isEnrollUsage() != true && getController().isIdentifyUsage() != true)
+			{
 				getBufferPoolManager().deleteBufferWithName(CAMERA_FRAME_BUFFER_POOL_ID, camera->getName());
 				getBufferPoolManager().deleteBufferWithName(CAMERA_CROP_BUFFER_POOL_ID, buf->getName());
 				continue;

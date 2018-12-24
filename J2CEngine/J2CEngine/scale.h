@@ -52,10 +52,31 @@ public:
 			// cscho (2018-12.22)
 			//
 			unsigned char* src = (unsigned char*)buf->getBuffer();
-			getController().CallEyeFindTest(src, buf->getName());
-
+			int nCntSPAll = 0, nCntSPUp = 0, nCntSPDn = 0;
+			getController().CallEyeFindTest(src, buf->getName(), nCntSPAll, nCntSPUp, nCntSPDn);
 			if (vecRoiSP.size() > 0)
 			{
+				if (vecRoiSP.size() == 1)
+				{
+					if (getController().GetEyeFindUseOpenCV() == false)
+					{
+						gEnrollIdx++;
+						//if (gEnrollIdx % 15 == 0)
+						{
+							RECT rt = vecRoiSP.at(0);
+							int cx = (rt.left + rt.right) / 2;
+							int cy = (rt.top + rt.bottom) / 2;
+							EnrollSharedBuffer enroll;
+							enroll.id = buf->getName();
+							enroll.opencvSharedBuffer = buf;
+							enroll.cropSharedBuffer = buf;
+							enroll.x = cx;
+							enroll.y = cy;
+							getEnrollMultiCoreQueue().putSharedBuffer(enroll);
+							gEnrollIdx = 0;
+						}
+					}
+				}
 				for (auto &&roi : vecRoiSP)
 				{
 					drawSpecular(forDisplay, roi);

@@ -240,6 +240,7 @@ public:
 			command = neuroShared.command;
 			if (command >= 0)
 			{
+				/*
 				if (command == ENROLL_END)
 				{
 					__enrollSaveAndReload();
@@ -252,6 +253,22 @@ public:
 				{
 					bool bRet = false;
 					bRet = __match(buf);
+				}
+				*/
+				switch (command)
+				{
+				case NEURO_ENROLL_COMMAND:
+					__enroll(buf);
+					break;
+				case NEURO_IDENTIFY_COMMAND:
+					{
+						bool bRet = false;
+						bRet = __match(buf);
+					}
+					break;
+				case NEURO_ENROLL_RELOAD_COMMAND:
+					__enrollSaveAndReload();
+					break;
 				}
 			}
 			else

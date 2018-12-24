@@ -41,7 +41,11 @@ public:
 				continue;
 
 			std::cout << "EnrollTask get Enroll Item" << std::endl;
-			SharedBuffer resized = resizeForNeruoTechnology(buf.cropSharedBuffer, buf.x, buf.y);
+			//
+			// cscho
+			//
+			//SharedBuffer resized = resizeForNeruoTechnology(buf.cropSharedBuffer, buf.x, buf.y);
+			SharedBuffer resized = resizeForNeruoTechnologySize(buf.cropSharedBuffer, buf.x, buf.y, 800, 600);
 			if (resized != nullptr)
 			{
 				NeuroTask &neuro = getNeuroTask();
@@ -62,6 +66,10 @@ public:
 #endif
 				resized = nullptr;
 			}
+			else
+			{
+				int a = 0;
+			}
 			getBufferPoolManager().deleteBufferWithName(CAMERA_CROP_BUFFER_POOL_ID, buf.cropSharedBuffer->getName());
 			getBufferPoolManager().deleteBufferWithName(OPENCV_BUFFER_POOL_ID, buf.opencvSharedBuffer->getName());
 			buf.cropSharedBuffer = nullptr;
@@ -76,6 +84,7 @@ public:
 
 	void saveToFile(SharedBuffer &buf, std::string &id);
 	SharedBuffer resizeForNeruoTechnology(SharedBuffer &buf, int x, int y);
+	SharedBuffer resizeForNeruoTechnologySize(SharedBuffer &buf, int x, int y, int width, int height);
 
 	bool stopFlag_;
 	std::thread *jobThread_;

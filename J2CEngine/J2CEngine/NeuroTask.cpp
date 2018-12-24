@@ -68,6 +68,12 @@ void NeuroTask::__enroll(SharedBuffer &buf)
 	}
 	else
 	{
+		std::string dir = workdir_ + "\\" + "enroll\\failed\\";
+		CreateDirectoryA(dir.c_str(), NULL);
+
+		//std::string filename = dir + currentEnrollName_ + "_" + std::to_string(status);
+		//getImageSaver().saveGrayImage(buf, filename + ".png", WIDTH_FOR_EYE_VIEW, HEIGHT_FOR_EYE_VIEW);
+
 		std::cout << "Failed to make template" << std::endl;
 		getController().enrollProxyCb(false);
 		return;
