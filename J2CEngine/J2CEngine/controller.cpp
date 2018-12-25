@@ -753,6 +753,7 @@ int Controller::FindSpecularCross(unsigned char* dest, int nRowFindStart, int nR
 					pVecRoiSPNot->push_back(rt);
 				}
 				// update pixel value to (BaseValue+1)
+				/*
 				for (int rowMask = rt.top; rowMask <= rt.bottom; rowMask++)
 				{
 					for (int colMask = rt.left; colMask <= rt.right; colMask++)
@@ -761,6 +762,7 @@ int Controller::FindSpecularCross(unsigned char* dest, int nRowFindStart, int nR
 						dest[nIdxPixel] = (nBaseValue + 1);
 					}
 				}
+				*/
 			}
 		}
 	}
