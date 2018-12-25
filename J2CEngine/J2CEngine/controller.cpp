@@ -1155,12 +1155,37 @@ void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPA
 		if (nRoiCount > 0)
 		{
 			bool bFindEye = false;
-			if (nRoiCount == 1)
-				bFindEye = true;
+
+			//if (nRoiCount == 1)
+			//	bFindEye = true;
+
+			// calculate all roi
+			bool bSaveDistRoi = false;
+			float fDeviationMax = 0.0f;
+			RECT roiMax = { 0, };
+			
+			for (auto &&roi : vecRoiSP)
+			{
+				int nCntRoiAll = 0, nCntRoiUp = 0, nCntRoiDn = 0;
+				float fDeviation = getController().CalculateDistance(src, roi, nDistExcludeThreshold, bSaveDistRoi, pszName, nBaseValue, nPixelContrast, nCntRoiAll, nCntRoiUp, nCntRoiDn, bDistTimeLogging);
+				int cx = (roi.left + roi.right) / 2;
+				int cy = (roi.top + roi.bottom) / 2;
+				//int cchDestChar = strlen(pszName) + 1;
+				//TCHAR wszName[_MAX_PATH] = _T("");
+				//MultiByteToWideChar(CP_ACP, 0, (LPCSTR)pszName, -1, wszName, cchDestChar - 1);
+				//LOG_PRINTF(0, _T("[Name= %s] Deviation= %0.5f (RECT= %d,%d)"), wszName, fDeviation, cx, cy);
+				if (fDeviation > fDeviationMax)
+				{
+					fDeviationMax = fDeviation;
+					roiMax = roi;
+					bFindEye = true;
+				}
+			}
 
 			if (bFindEye)
 			{
-				RECT rtROI = vecRoiSP.at(0);
+				//RECT rtROI = vecRoiSP.at(0);
+				RECT rtROI = roiMax;
 
 				// save mask
 				if (bSaveMask)
