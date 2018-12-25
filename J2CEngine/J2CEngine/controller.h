@@ -417,6 +417,10 @@ public:
 	int m_nEyeFindLineMax;	
 	int GetEyeFindScanLineMin() { return m_nEyeFindLineMin; }
 	int GetEyeFindScanLineMax() { return m_nEyeFindLineMax; }
+	int m_nEyeFindLineGroupMin;
+	int m_nEyeFindLineGroupMax;
+	int GetEyeFindScanLineGroupMin() { return m_nEyeFindLineGroupMin; }
+	int GetEyeFindScanLineGroupMax() { return m_nEyeFindLineGroupMax; }
 	int m_nEyeFindRatioMin;
 	int GetEyeFindScanRatioMin() { return m_nEyeFindRatioMin; }
 	bool m_bEyeFindUseOpenCV;

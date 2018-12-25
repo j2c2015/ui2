@@ -242,6 +242,8 @@ void Controller::LoadConfiguration()
 	m_nEyeFindAreaMax = GetPrivateProfileInt(_T("EYEFIND"), _T("AREA_MAX"), 400, m_szConfPath);
 	m_nEyeFindLineMin = GetPrivateProfileInt(_T("EYEFIND"), _T("LINE_MIN"), 10, m_szConfPath);
 	m_nEyeFindLineMax = GetPrivateProfileInt(_T("EYEFIND"), _T("LINE_MAX"), 64, m_szConfPath);
+	m_nEyeFindLineGroupMin = GetPrivateProfileInt(_T("EYEFIND"), _T("LINE_GROUP_MIN"), 10, m_szConfPath);
+	m_nEyeFindLineGroupMax = GetPrivateProfileInt(_T("EYEFIND"), _T("LINE_GROUP_MAX"), 64, m_szConfPath);
 	m_nEyeFindRatioMin = GetPrivateProfileInt(_T("EYEFIND"), _T("RATIO_MIN"), 80, m_szConfPath);
 	m_bEyeFindUseOpenCV = (bool)GetPrivateProfileInt(_T("EYEFIND"), _T("USE_CVFIND"), 1, m_szConfPath);
 	m_nEyeFindCheckInterval = GetPrivateProfileInt(_T("EYEFIND"), _T("CHECK_INTERVAL"), 15, m_szConfPath);
@@ -711,7 +713,13 @@ int Controller::FindSpecularCross(unsigned char* dest, int nRowFindStart, int nR
 					rt.right = baseCol + nOffsetRight;
 				}
 
+				// line check
 				distance = (nOffsetRight + nOffsetLeft);
+				if (distance < m_nEyeFindLineGroupMin || distance > m_nEyeFindLineGroupMax)
+				{
+					break;
+				}
+
 				if (distance > 1)
 				{
 					baseCol = (baseCol - nOffsetLeft + (distance / 2));
