@@ -1404,7 +1404,7 @@ void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPA
 						{
 							int nIdxPixel = ((row * WIDTH_FOR_CAMERA_CROP) + col);
 							unsigned char value = dest[nIdxPixel];
-							if (value >= nBaseValue)
+							if (value == 1 || value == 101)
 								value = 255;
 							test[nIdxPixel] = value;
 						}
@@ -1453,7 +1453,7 @@ void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPA
 							{
 								int nIdxPixel = ((row * WIDTH_FOR_CAMERA_CROP) + col);
 								unsigned char value = dest[nIdxPixel];
-								if (value >= nBaseValue)
+								if (value == 1 || value == 101)
 									value = 255;
 								test[nIdxPixel] = value;
 							}
