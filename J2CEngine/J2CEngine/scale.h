@@ -51,9 +51,17 @@ public:
 			//
 			// cscho (2018-12.22)
 			//
+			FILE* fp = NULL;
+			if (getController().GetEyeFindScanViewSPAll())
+				fp = LOG_PRINTF_FP(0, NULL, _T(""));
 			unsigned char* src = (unsigned char*)buf->getBuffer();
 			int nCntSPAll = 0, nCntSPUp = 0, nCntSPDn = 0;
-			getController().CallEyeFindTest(src, buf->getName(), nCntSPAll, nCntSPUp, nCntSPDn);
+			getController().CallEyeFindTest(src, buf->getName(), nCntSPAll, nCntSPUp, nCntSPDn, fp);
+			if (fp)
+			{
+				fclose(fp);
+			}
+
 			if (vecRoiSP.size() > 0)
 			{
 				if (vecRoiSP.size() == 1)
@@ -206,7 +214,7 @@ public:
 
 			if (saveFlag_ == true)
 			{
-				std::string path = savePath_ + "\\" + "crop" + buf->getName()+".png";
+				std::string path = savePath_ + "\\" + "crop_" + buf->getName()+".png";
 				getImageSaver().saveGrayImage(buf, path, WIDTH_FOR_CAMERA_CROP, HEIGHT_FOR_CAMERA_CROP);
 			}
 

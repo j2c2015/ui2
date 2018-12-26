@@ -247,6 +247,7 @@ void Controller::LoadConfiguration()
 	m_nEyeFindRatioMin = GetPrivateProfileInt(_T("EYEFIND"), _T("RATIO_MIN"), 80, m_szConfPath);
 	m_bEyeFindUseOpenCV = (bool)GetPrivateProfileInt(_T("EYEFIND"), _T("USE_CVFIND"), 1, m_szConfPath);
 	m_nEyeFindCheckInterval = GetPrivateProfileInt(_T("EYEFIND"), _T("CHECK_INTERVAL"), 15, m_szConfPath);
+	m_bEyeFindViewSPAll = (bool)GetPrivateProfileInt(_T("EYEFIND"), _T("VIEWSP_ALL"), 0, m_szConfPath);
 	m_bEyeFindSaveMask = (bool)GetPrivateProfileInt(_T("EYEFIND"), _T("SAVE_MASK"), 0, m_szConfPath);
 	m_bEyeFindSaveSpecular = (bool)GetPrivateProfileInt(_T("EYEFIND"), _T("SAVE_SPECULAR"), 0, m_szConfPath);
 	m_bEyeFindTimeLogging = (bool)GetPrivateProfileInt(_T("EYEFIND"), _T("TIME_LOGGING"), 0, m_szConfPath);
@@ -591,33 +592,34 @@ int Controller::MaskingChunkFromBuf(unsigned char* pBufSrc, unsigned char* pBufD
 			else
 			{
 				value = 1;
+				/*
+				// up (base+=1)
+				if (row - 1 >= nRowStart)
+				{
+					nIdxPxUp = (((row - 1) * WIDTH_FOR_CAMERA_CROP) + col);
+					pBufDest[nIdxPxUp] += 1;
+				}
+				// down (base+=1)
+				if (row + 1 < nRowEnd)
+				{
+					nIdxPxDn = (((row + 1) * WIDTH_FOR_CAMERA_CROP) + col);
+					pBufDest[nIdxPxDn] += 1;
+				}
+				// left (base+=1)
+				if (col - 1 >= nColStart)
+				{
+					nIdxPxLt = ((row * WIDTH_FOR_CAMERA_CROP) + (col - 1));
+					pBufDest[nIdxPxLt] += 1;
+				}
+				// right (base+=1)
+				if (col + 1 < nColEnd)
+				{
+					nIdxPxRt = ((row * WIDTH_FOR_CAMERA_CROP) + (col + 1));
+					pBufDest[nIdxPxRt] += 1;
+				}
+				*/
 			}
 			pBufDest[nIdxPixel] += value;
-
-			// up (base+=1)
-			if (row - 1 >= nRowStart)
-			{
-				nIdxPxUp = (((row - 1) * WIDTH_FOR_CAMERA_CROP) + col);
-				pBufDest[nIdxPxUp] += value;
-			}
-			// down (base+=1)
-			if (row + 1 < nRowEnd)
-			{
-				nIdxPxDn = (((row + 1) * WIDTH_FOR_CAMERA_CROP) + col);
-				pBufDest[nIdxPxDn] += value;
-			}
-			// left (base+=1)
-			if (col - 1 >= nColStart)
-			{
-				nIdxPxLt = ((row * WIDTH_FOR_CAMERA_CROP) + (col - 1));
-				pBufDest[nIdxPxLt] += value;
-			}
-			// right (base+=1)
-			if (col + 1 < nColEnd)
-			{
-				nIdxPxRt = ((row * WIDTH_FOR_CAMERA_CROP) + (col + 1));
-				pBufDest[nIdxPxRt] += value;
-			}
 
 			if (pixel >= nPixelContrast)
 			{
@@ -638,7 +640,7 @@ int Controller::MaskingChunkFromBuf(unsigned char* pBufSrc, unsigned char* pBufD
 	return nBaseValue;
 }
 
-int Controller::FindSpecularCross(unsigned char* dest, int nRowFindStart, int nRowFindEnd, int nColFindStart, int nColFindEnd, int nBaseValue, std::vector<RECT>* pVecRoiSP, std::vector<RECT>* pVecRoiSPNot, int nResultAdded, bool bCheckCond, bool bTimeLogging)
+int Controller::FindSpecularCross(unsigned char* dest, char* pszName, int nRowFindStart, int nRowFindEnd, int nColFindStart, int nColFindEnd, int nBaseValue, std::vector<RECT>* pVecRoiSP, std::vector<RECT>* pVecRoiSPNot, int nResultAdded, bool bCheckCond, FILE* fpLog, bool bTimeLogging)
 {
 	CEllapsedTime timeLogging;
 	if (bTimeLogging)
@@ -647,6 +649,10 @@ int Controller::FindSpecularCross(unsigned char* dest, int nRowFindStart, int nR
 		LOG_PRINTF(0, _T("Starting for finding specular. (BaseValue= %d)"), nBaseValue);
 		timeLogging.StartEllapsedTime();
 	}
+
+	int nNameId = atoi(pszName);
+	TCHAR szName[10] = { 0, };
+	_stprintf(szName, _T("%d"), nNameId);
 
 	int nIdxPixel = 0;
 	int nOffsetDown = 0;
@@ -657,52 +663,62 @@ int Controller::FindSpecularCross(unsigned char* dest, int nRowFindStart, int nR
 		{
 			nIdxPixel = ((row * WIDTH_FOR_CAMERA_CROP) + col);
 			unsigned char value = dest[nIdxPixel];
-			// lower than basevalue
-			if (value < nBaseValue)
-			{
-				continue;
-			}
+
+
+			/////////////////////////////////////////////////////////////////////////////
 			// already check
-			if (value > nBaseValue)
+			if (value >= 100)
 			{
 				continue;
 			}
+			// lower than basevalue
+			if (value != 1)
+			{
+				continue;
+			}
+			/////////////////////////////////////////////////////////////////////////////
+
 
 			RECT rt = { col, row, col, row };
 			int distance = 0;
 			int baseCol = col;
 			int nOffsetDown = 0;
 
-			while (value == nBaseValue)
+			while (value == 1)
 			{
+				if ((row + nOffsetDown) > nRowFindEnd)
+					break;
+
 				nIdxPixel = (((row + nOffsetDown) * WIDTH_FOR_CAMERA_CROP) + baseCol);
-				dest[nIdxPixel] += 1;
+				dest[nIdxPixel] += 100;
 
 				int nOffsetRight = 0, nOffsetLeft = 0;
 
 				// right
 				do
 				{
+					if ((baseCol + nOffsetRight + 1) > nColFindEnd)
+						break;
 					nOffsetRight++;
 					nIdxPixel = (((row + nOffsetDown) * WIDTH_FOR_CAMERA_CROP) + (baseCol + nOffsetRight));
 					value = dest[nIdxPixel];
-					if (value != nBaseValue)
+					if (value != 1)
 						nOffsetRight--;
-					else
-						dest[nIdxPixel] += 1;
-				} while (value == nBaseValue);
+					dest[nIdxPixel] += 100;
+				} while (value == 1);
 
 				// left
 				do
 				{
+					if ((baseCol - nOffsetLeft - 1) < nColFindStart)
+						break;
 					nOffsetLeft++;
 					nIdxPixel = (((row + nOffsetDown) * WIDTH_FOR_CAMERA_CROP) + (baseCol - nOffsetLeft));
 					value = dest[nIdxPixel];
-					if (value != nBaseValue)
+					if (value != 1)
 						nOffsetLeft--;
-					else
-						dest[nIdxPixel] += 1;
-				} while (value == nBaseValue);
+					dest[nIdxPixel] += 100;
+				} while (value == 1);
 
 				if ((baseCol - nOffsetLeft) < rt.left)
 				{
@@ -713,8 +729,8 @@ int Controller::FindSpecularCross(unsigned char* dest, int nRowFindStart, int nR
 					rt.right = baseCol + nOffsetRight;
 				}
 
-				// line check
-				distance = (nOffsetRight + nOffsetLeft);
+				// line length check
+				distance = (nOffsetRight + nOffsetLeft) + 1;
 				if (distance < m_nEyeFindLineGroupMin || distance > m_nEyeFindLineGroupMax)
 				{
 					break;
@@ -732,7 +748,7 @@ int Controller::FindSpecularCross(unsigned char* dest, int nRowFindStart, int nR
 				nOffsetDown++;
 				nIdxPixel = (((row + nOffsetDown) * WIDTH_FOR_CAMERA_CROP) + baseCol);
 				value = dest[nIdxPixel];
-				if (value == nBaseValue)
+				if (value == 1)
 				{
 					rt.bottom = row + nOffsetDown;
 				}
@@ -743,7 +759,7 @@ int Controller::FindSpecularCross(unsigned char* dest, int nRowFindStart, int nR
 				if (bCheckCond)
 				{
 					bool bCondLogging = GetEyeFindScanCondLogging();
-					bCondPass = CheckSpecularCond(&rt, bCondLogging);
+					bCondPass = CheckSpecularCond(&rt, szName, fpLog, bCondLogging);
 				}
 				if (bCondPass)
 				{
@@ -783,10 +799,13 @@ int Controller::FindSpecularCross(unsigned char* dest, int nRowFindStart, int nR
 	return pVecRoiSP->size();
 }
 
-bool Controller::CheckSpecularCond(RECT* pRt, bool bCondLogging)
+bool Controller::CheckSpecularCond(RECT* pRt, TCHAR* pszName, FILE* fpLog, bool bCondLogging)
 {
 	int nWidth = pRt->right - pRt->left;
 	int nHeight = pRt->bottom - pRt->top;
+
+	TCHAR szHdr[64] = _T("");
+	_stprintf(szHdr, _T("[Name= %s : %d,%d]"), pszName, pRt->left, pRt->top);
 
 	// line
 	int lineMin = getController().GetEyeFindScanLineMin();
@@ -794,13 +813,17 @@ bool Controller::CheckSpecularCond(RECT* pRt, bool bCondLogging)
 	if (nWidth < lineMin || nWidth > lineMax)
 	{
 		if (bCondLogging)
-			LOG_PRINTF(0, _T("Failed to pass condition. [Width= %d]"), nWidth);
+			LOG_PRINTF(0, _T("%s Failed to pass condition. [Width= %d]"), szHdr, nWidth);
+		else if (fpLog)
+			LOG_PRINTF_FP(0, fpLog, _T("%s Failed to pass condition. [Width= %d]"), szHdr, nWidth);
 		return false;
 	}
 	if (nHeight < lineMin || nHeight > lineMax)
 	{
 		if (bCondLogging)
-			LOG_PRINTF(0, _T("Failed to pass condition. [Height= %d]"), nHeight);
+			LOG_PRINTF(0, _T("%s Failed to pass condition. [Height= %d]"), szHdr, nHeight);
+		else if (fpLog)
+			LOG_PRINTF_FP(0, fpLog, _T("%s Failed to pass condition. [Height= %d]"), szHdr, nHeight);
 		return false;
 	}
 
@@ -811,7 +834,9 @@ bool Controller::CheckSpecularCond(RECT* pRt, bool bCondLogging)
 	if (nArea < areaMin || nArea > areaMax)
 	{
 		if (bCondLogging)
-			LOG_PRINTF(0, _T("Failed to pass condition. [Area= %d]"), nArea);
+			LOG_PRINTF(0, _T("%s Failed to pass condition. [Area= %d]"), szHdr, nArea);
+		else if (fpLog)
+			LOG_PRINTF_FP(0, fpLog, _T("%s Failed to pass condition. [Area= %d]"), szHdr, nArea);
 		return false;
 	}
 
@@ -826,7 +851,9 @@ bool Controller::CheckSpecularCond(RECT* pRt, bool bCondLogging)
 	if (fRatio < ratioMin)
 	{
 		if (bCondLogging)
-			LOG_PRINTF(0, _T("Failed to pass condition. [Ratio= %d]"), (int)fRatio);
+			LOG_PRINTF(0, _T("%s Failed to pass condition. [Ratio= %d]"), szHdr, (int)fRatio);
+		else if (fpLog)
+			LOG_PRINTF_FP(0, fpLog, _T("%s Failed to pass condition. [Ratio= %d]"), szHdr, (int)fRatio);
 		return false;
 	}
 	
@@ -930,14 +957,14 @@ float Controller::CalculateDistance(unsigned char* src, RECT& rtROI, int nExclud
 		for (int col = roiDeviation.left, j = 0; col < roiDeviation.right; col++, j++)
 		{
 			int nIdxPixel = (((row + 0) * WIDTH_FOR_CAMERA_CROP) + (col + 0));
-			unsigned char pixel = src[nIdxPixel];			
+			unsigned char pixel = src[nIdxPixel];
 			if (ppCopyValue)
 			{
 				ppCopyValue[i][j] = pixel;
 			}
 		}
 	}
-	
+
 	if (ppCopyValue)
 	{
 		CopyRoiValueToClipboard(ppCopyValue, m_nEyeDistRoiDimension, m_nEyeDistRoiDimension, bTimeLogging);
@@ -985,7 +1012,7 @@ float Controller::CalculateDistance(unsigned char* src, RECT& rtROI, int nExclud
 				continue;
 			}
 			nCntInclude++;
-			
+
 			double fAvg = (fSumValue / (double)(nRoiSample * nRoiSample));
 			if (bTimeLogging)
 			{
@@ -1010,7 +1037,7 @@ float Controller::CalculateDistance(unsigned char* src, RECT& rtROI, int nExclud
 			{
 				//LOG_PRINTF(0, _T("[Step.2] Deviation-Sum= %0.3f, Variance= %0.3f, (count= %d)"), fSumDeviation, fVariance, nCntSumDev);
 			}
-			
+
 			float fStdDeviation = sqrt(fVariance);
 			if (bTimeLogging)
 			{
@@ -1033,13 +1060,13 @@ float Controller::CalculateDistance(unsigned char* src, RECT& rtROI, int nExclud
 		roiDev.y = roiDeviation.top - 2;
 		roiDev.width = (roiDeviation.right - roiDeviation.left) + 4;
 		roiDev.height = (roiDeviation.bottom - roiDeviation.top) + 4;
-		Mat _srcDist = cv::Mat(cvSize(WIDTH_FOR_CAMERA_CROP, HEIGHT_FOR_CAMERA_CROP), CV_8UC1, src, cv::Mat::AUTO_STEP);		
+		Mat _srcDist = cv::Mat(cvSize(WIDTH_FOR_CAMERA_CROP, HEIGHT_FOR_CAMERA_CROP), CV_8UC1, src, cv::Mat::AUTO_STEP);
 		Mat srcDist;
 		cvtColor(_srcDist, srcDist, cv::COLOR_GRAY2BGR);
 		rectangle(srcDist, roiDev, Scalar(0, 255, 0), 1);
-		
+
 		char szDeviation[64] = "";
-		sprintf(szDeviation, "Deviation= %0.3f [In= %d, Ex= %d]", fStdDeviationSum, nCntInclude, nCntExclude);
+		sprintf(szDeviation, "[%d,%d]= %0.3f [In= %d, Ex= %d]", nROICenterX, nROICenterY, fStdDeviationSum, nCntInclude, nCntExclude);
 		int baseLine = 0;
 		cv::Size szText = getTextSize(szDeviation, CV_FONT_HERSHEY_PLAIN, 1.0, 1, &baseLine);
 		cv::Rect roiText;
@@ -1067,10 +1094,193 @@ float Controller::CalculateDistance(unsigned char* src, RECT& rtROI, int nExclud
 		sprintf(szPixelCount, "Pixel[%d] All= %d, Up= %d, Down= %d", nPixelContrast, nCntSPAll, nCntSPUp, nCntSPDn);
 		cv::Point ptPixel = { 0, 30 };
 		cv::putText(srcDist, szPixelCount, ptPixel, CV_FONT_HERSHEY_PLAIN, 1.2, Scalar(255, 0, 0));
-		
+
 		imwrite(pathDist, srcDist);
 	}
 	return fStdDeviationSum;
+}
+
+float Controller::CalculateDistanceAll(unsigned char* src, std::vector<RECT>* pVecRoiSP, int nExcludeThreshold, bool bSaveDist, char* pszName, int nBaseValue, int nPixelContrast, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, bool bTimeLogging)
+{
+	int nRoiDim = (m_nEyeDistRoiDimension / 2);
+	int nRoiSample = m_nEyeDistRoiSample;
+
+	char pathDist[256] = { 0, };
+	int nNameId = atoi(pszName);
+	TCHAR szName[10] = { 0, };
+	_stprintf(szName, _T("%d"), nNameId);
+	sprintf(pathDist, "c:\\jtwoc\\eyetest\\test_distance_%d.png", nNameId);
+
+	CEllapsedTime timeLogging;
+	if (bTimeLogging)
+	{
+		FUNCTION_NAME_IS(_T("Controller::CalculateDistance"));
+		//LOG_PRINTF(0, _T("Starting caculating distance. (Name= %s)"), pszName);
+		timeLogging.StartEllapsedTime();
+	}
+
+	float fStdDeviationMax = 0.0f;
+	RECT rtRoiMax = { 0, };
+
+	Mat _srcDist = cv::Mat(cvSize(WIDTH_FOR_CAMERA_CROP, HEIGHT_FOR_CAMERA_CROP), CV_8UC1, src, cv::Mat::AUTO_STEP);
+	Mat srcDist;
+	cvtColor(_srcDist, srcDist, cv::COLOR_GRAY2BGR);
+
+	for (auto && roi : *pVecRoiSP)
+	{
+		RECT roiDeviation = roi;
+		
+		int nROIWidth = (roi.right - roi.left);
+		int nROIHeight = (roi.bottom - roi.top);
+		int nROICenterX = roi.left + (nROIWidth / 2);
+		int nROICenterY = roi.top + (nROIHeight / 2);
+
+		roiDeviation.left = nROICenterX - nRoiDim;
+		roiDeviation.right = nROICenterX + nRoiDim;
+		roiDeviation.top = nROICenterY - nRoiDim;
+		roiDeviation.bottom = nROICenterY + nRoiDim;
+
+		int nIdxPixel = 0;
+		float fStdDeviationSum = 0.0f;
+		int nCntInclude = 0, nCntExclude = 0;
+		for (int row = roiDeviation.top; row < (roiDeviation.bottom - nRoiSample); row++)
+		{
+			for (int col = roiDeviation.left; col < (roiDeviation.right - nRoiSample); col++)
+			{
+				unsigned char value[3][3] = { 0, };
+				double deviation[3][3] = { 0.0, };
+
+				bool bExcludeThreshold = false;
+				double fSumValue = 0.0;
+				int nCntSum = 0;
+				for (int roiY = 0; roiY < nRoiSample; roiY++)
+				{
+					for (int roiX = 0; roiX < nRoiSample; roiX++)
+					{
+						nIdxPixel = (((row + roiY) * WIDTH_FOR_CAMERA_CROP) + (col + roiX));
+						unsigned char pixel = src[nIdxPixel];
+						if (pixel >= nExcludeThreshold)
+						{
+							bExcludeThreshold = true;
+							break;
+						}
+						value[roiY][roiX] = pixel;
+						fSumValue += pixel;
+						nCntSum++;
+					}
+					if (bExcludeThreshold)
+						break;
+				}
+				if (bExcludeThreshold)
+				{
+					nCntExclude++;
+					continue;
+				}
+				nCntInclude++;
+
+				double fAvg = (fSumValue / (double)(nRoiSample * nRoiSample));
+				if (bTimeLogging)
+				{
+					//LOG_PRINTF(0, _T("[Step.1] Sum= %0.1f, Average= %0.3f, (count= %d)"), fSumValue, fAvg, nCntSum);
+				}
+
+				double fSumDeviation = 0.0;
+				int nCntSumDev = 0;
+				for (int roiY = 0; roiY < nRoiSample; roiY++)
+				{
+					for (int roiX = 0; roiX < nRoiSample; roiX++)
+					{
+						double dev = (value[roiY][roiX] - fAvg);
+						deviation[roiY][roiX] = (dev * dev);
+						fSumDeviation += (dev * dev);
+						nCntSumDev++;
+					}
+				}
+				double fVariance = (fSumDeviation / (double)(nRoiSample * nRoiSample));
+
+				if (bTimeLogging)
+				{
+					//LOG_PRINTF(0, _T("[Step.2] Deviation-Sum= %0.3f, Variance= %0.3f, (count= %d)"), fSumDeviation, fVariance, nCntSumDev);
+				}
+
+				float fStdDeviation = sqrt(fVariance);
+				if (bTimeLogging)
+				{
+					//LOG_PRINTF(0, _T("[Step.3] Standard-Deviation= %0.3f"), fStdDeviation);
+				}
+				fStdDeviationSum += fStdDeviation;
+			}
+		}
+		if (fStdDeviationSum > fStdDeviationMax)
+		{
+			fStdDeviationMax = fStdDeviationSum;
+			rtRoiMax = roiDeviation;
+		}
+
+		if (bTimeLogging)
+		{
+			double fTimeDistance = timeLogging.EndEllapsedTime();
+			LOG_PRINTF(0, _T("Finished caculating distance[Name= %5.5s]. (Deviation= %0.3f, Time= %0.5f)"), szName, fStdDeviationSum, fTimeDistance);
+		}
+
+		cv::Rect roiDev;
+		roiDev.x = roiDeviation.left;
+		roiDev.y = roiDeviation.top;
+		roiDev.width = (roiDeviation.right - roiDeviation.left);
+		roiDev.height = (roiDeviation.bottom - roiDeviation.top);
+		rectangle(srcDist, roiDev, Scalar(0, 0, 255), 1);
+
+		cv::Rect roiSP;
+		roiSP.x = roi.left;
+		roiSP.y = roi.top;
+		roiSP.width = (roi.right - roi.left);
+		roiSP.height = (roi.bottom - roi.top);
+		rectangle(srcDist, roiSP, Scalar(255, 0, 0), 1);
+
+		char szDeviation[64] = "";
+		sprintf(szDeviation, "[%d,%d]= %0.3f [In= %d, Ex= %d]", nROICenterX, nROICenterY, fStdDeviationSum, nCntInclude, nCntExclude);
+		int baseLine = 0;
+		cv::Size szText = getTextSize(szDeviation, CV_FONT_HERSHEY_PLAIN, 1.0, 1, &baseLine);
+		cv::Rect roiText;
+		roiText.width = szText.width;
+		roiText.height = szText.height + 10;
+		roiText.x = roiDeviation.left;
+		if (roiText.x + roiText.width > WIDTH_FOR_CAMERA_CROP)
+		{
+			roiText.x = (WIDTH_FOR_CAMERA_CROP - szText.width - 5);
+		}
+		roiText.y = roiDeviation.top - (szText.height + 15);
+		if (roiText.y + roiText.height > HEIGHT_FOR_CAMERA_CROP)
+		{
+			roiText.y = (HEIGHT_FOR_CAMERA_CROP - roiText.height - 5);
+		}
+		cv::Mat textRect = srcDist(roiText);
+		cv::Mat color(textRect.size(), CV_8UC3, Scalar(255, 255, 255));
+		double alpha = 0.5;
+		cv::addWeighted(color, alpha, textRect, 1.0 - alpha, 0.0, textRect);
+		cv::Point ptDev = { roiText.x, roiDeviation.top - 10 };
+		cv::putText(srcDist, szDeviation, ptDev, CV_FONT_HERSHEY_PLAIN, 1.0, Scalar(255, 0, 255));
+	}
+
+	cv::Rect roiDevMax;
+	roiDevMax.x = rtRoiMax.left;
+	roiDevMax.y = rtRoiMax.top;
+	roiDevMax.width = (rtRoiMax.right - rtRoiMax.left);
+	roiDevMax.height = (rtRoiMax.bottom - rtRoiMax.top);
+	rectangle(srcDist, roiDevMax, Scalar(0, 255, 0), 1);
+
+	// save distance
+	if (bSaveDist)
+	{
+		char szPixelCount[64] = "";
+		int threshold = GetEyeFindScanThreshold();
+		sprintf(szPixelCount, "Pixel[%d] All= %d, Up= %d, Down= %d", nPixelContrast, nCntSPAll, nCntSPUp, nCntSPDn);
+		cv::Point ptPixel = { 0, 30 };
+		cv::putText(srcDist, szPixelCount, ptPixel, CV_FONT_HERSHEY_PLAIN, 1.2, Scalar(255, 0, 0));
+
+		imwrite(pathDist, srcDist);
+	}
+	return fStdDeviationMax;
 }
 
 void Controller::CallEyeFindTestFile(char* pszFilePath)
@@ -1103,11 +1313,18 @@ void Controller::CallEyeFindTestFile(char* pszFilePath)
 		}
 
 		int nCntSPAll = 0, nCntSPUp = 0, nCntSPDn = 0;
-		CallEyeFindTest(src, pszFName, nCntSPAll, nCntSPUp, nCntSPDn);
+		FILE* fp = NULL;
+		if (m_bEyeFindViewSPAll)
+			fp = LOG_PRINTF_FP(0, NULL, _T(""));
+		CallEyeFindTest(src, pszFName, nCntSPAll, nCntSPUp, nCntSPDn, fp);
+		if (fp)
+		{
+			fclose(fp);
+		}
 	}
 }
 
-void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn)
+void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, FILE* fpLog)
 {
 	int ScanHeight = GetEyeFindScanHeight();
 	int ScanWidth = GetEyeFindScanWidth();
@@ -1161,41 +1378,20 @@ void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPA
 			//
 		}
 
-		int nRoiCount = getController().FindSpecularCross(dest, nRowFindStart, nRowFindEnd, nColFindStart, nColFindEnd, nBaseValue, &vecRoiSP, &vecRoiSPNot, resultAdded, bCheckCond, bTimeLogging);
-		if (nRoiCount > 0)
+		int nRoiCount = getController().FindSpecularCross(dest, pszName, nRowFindStart, nRowFindEnd, nColFindStart, nColFindEnd, nBaseValue, &vecRoiSP, &vecRoiSPNot, resultAdded, bCheckCond, fpLog, bTimeLogging);
+		if (nRoiCount <= 0)
 		{
-			bool bFindEye = false;
-
-			//if (nRoiCount == 1)
-			//	bFindEye = true;
-
+			int nNameId = atoi(pszName);
+			TCHAR szName[10] = { 0, };
+			_stprintf(szName, _T("%d"), nNameId);
+			LOG_PRINTF_FP(0, fpLog, _T("[Name= %s] ROI count = %d"), szName, nRoiCount);
+		}
+		else
+		{
 			// calculate all roi
-			bool bSaveDistRoi = false;
-			float fDeviationMax = 0.0f;
-			RECT roiMax = { 0, };
-			
-			for (auto &&roi : vecRoiSP)
+			if (m_bEyeFindViewSPAll)
 			{
-				int nCntRoiAll = 0, nCntRoiUp = 0, nCntRoiDn = 0;
-				float fDeviation = getController().CalculateDistance(src, roi, nDistExcludeThreshold, bSaveDistRoi, pszName, nBaseValue, nPixelContrast, nCntRoiAll, nCntRoiUp, nCntRoiDn, bDistTimeLogging);
-				int cx = (roi.left + roi.right) / 2;
-				int cy = (roi.top + roi.bottom) / 2;
-				//int cchDestChar = strlen(pszName) + 1;
-				//TCHAR wszName[_MAX_PATH] = _T("");
-				//MultiByteToWideChar(CP_ACP, 0, (LPCSTR)pszName, -1, wszName, cchDestChar - 1);
-				//LOG_PRINTF(0, _T("[Name= %s] Deviation= %0.5f (RECT= %d,%d)"), wszName, fDeviation, cx, cy);
-				if (fDeviation > fDeviationMax)
-				{
-					fDeviationMax = fDeviation;
-					roiMax = roi;
-					bFindEye = true;
-				}
-			}
-
-			if (bFindEye)
-			{
-				//RECT rtROI = vecRoiSP.at(0);
-				RECT rtROI = roiMax;
+				float fDeviationMax = getController().CalculateDistanceAll(src, &vecRoiSP, nDistExcludeThreshold, bSaveDist, pszName, nBaseValue, nPixelContrast, nCntSPAll, nCntSPUp, nCntSPDn, bDistTimeLogging);
 
 				// save mask
 				if (bSaveMask)
@@ -1218,24 +1414,74 @@ void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPA
 					sprintf(pathTest, "c:\\jtwoc\\eyetest\\test_mask_%s.png", pszName);
 					imwrite(pathTest, _srcTest);
 				}
-				// save specular display
-				if (bSaveSpecular)
+			}
+			else
+			{
+				bool bFindEye = false;
+
+				bool bSaveDistRoi = false;
+				float fDeviationMax = 0.0f;
+				RECT roiMax = { 0, };
+
+				bool bFirstRoi = true;
+				for (auto &&roi : vecRoiSP)
 				{
-					cv::Rect roiSP;
-					roiSP.x = rtROI.left;
-					roiSP.y = rtROI.top;
-					roiSP.width = (rtROI.right - rtROI.left);
-					roiSP.height = (rtROI.bottom - rtROI.top);
-					Mat _srcSP = cv::Mat(cvSize(WIDTH_FOR_CAMERA_CROP, HEIGHT_FOR_CAMERA_CROP), CV_8UC1, src, cv::Mat::AUTO_STEP);
-					Mat srcSP;
-					cvtColor(_srcSP, srcSP, cv::COLOR_GRAY2BGR);
-					rectangle(srcSP, roiSP, Scalar(255, 0, 255), 1);
-					char pathSP[256] = { 0, };
-					sprintf(pathSP, "c:\\jtwoc\\eyetest\\test_specular_%s.png", pszName);
-					imwrite(pathSP, srcSP);
+					int nCntRoiAll = 0, nCntRoiUp = 0, nCntRoiDn = 0;
+					float fDeviation = getController().CalculateDistance(src, roi, nDistExcludeThreshold, bSaveDistRoi, pszName, nBaseValue, nPixelContrast, nCntRoiAll, nCntRoiUp, nCntRoiDn, bDistTimeLogging);
+					int cx = (roi.left + roi.right) / 2;
+					int cy = (roi.top + roi.bottom) / 2;
+					if (bFirstRoi || (fDeviation > fDeviationMax))
+					{
+						fDeviationMax = fDeviation;
+						roiMax = roi;
+						bFirstRoi = false;
+						bFindEye = true;
+					}
 				}
-				// calculate distance
-				float fDeviation = getController().CalculateDistance(src, rtROI, nDistExcludeThreshold, bSaveDist, pszName, nBaseValue, nPixelContrast, nCntSPAll, nCntSPUp, nCntSPDn, bDistTimeLogging);
+
+				if (bFindEye)
+				{
+					RECT rtROI = roiMax;
+					// save mask
+					if (bSaveMask)
+					{
+						unsigned char* test = (unsigned char*)bufTest->getBuffer();
+						memset(test, 0x00, FRAMESIZE_FOR_MASK_TEST);
+						for (int row = 0; row < HEIGHT_FOR_CAMERA_CROP; row++)
+						{
+							for (int col = 0; col < WIDTH_FOR_CAMERA_CROP; col++)
+							{
+								int nIdxPixel = ((row * WIDTH_FOR_CAMERA_CROP) + col);
+								unsigned char value = dest[nIdxPixel];
+								if (value >= nBaseValue)
+									value = 255;
+								test[nIdxPixel] = value;
+							}
+						}
+						Mat _srcTest = cv::Mat(cvSize(WIDTH_FOR_CAMERA_CROP, HEIGHT_FOR_CAMERA_CROP), CV_8UC1, test, cv::Mat::AUTO_STEP);
+						char pathTest[256] = { 0, };
+						sprintf(pathTest, "c:\\jtwoc\\eyetest\\test_mask_%s.png", pszName);
+						imwrite(pathTest, _srcTest);
+					}
+					// save specular display
+					if (bSaveSpecular)
+					{
+						cv::Rect roiSP;
+						roiSP.x = rtROI.left;
+						roiSP.y = rtROI.top;
+						roiSP.width = (rtROI.right - rtROI.left);
+						roiSP.height = (rtROI.bottom - rtROI.top);
+						Mat _srcSP = cv::Mat(cvSize(WIDTH_FOR_CAMERA_CROP, HEIGHT_FOR_CAMERA_CROP), CV_8UC1, src, cv::Mat::AUTO_STEP);
+						Mat srcSP;
+						cvtColor(_srcSP, srcSP, cv::COLOR_GRAY2BGR);
+						rectangle(srcSP, roiSP, Scalar(255, 0, 255), 1);
+						char pathSP[256] = { 0, };
+						sprintf(pathSP, "c:\\jtwoc\\eyetest\\test_specular_%s.png", pszName);
+						imwrite(pathSP, srcSP);
+					}
+					// calculate distance
+					float fDeviation = getController().CalculateDistance(src, rtROI, nDistExcludeThreshold, bSaveDist, pszName, nBaseValue, nPixelContrast, nCntSPAll, nCntSPUp, nCntSPDn, bDistTimeLogging);
+				}
 			}
 		}
 

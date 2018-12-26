@@ -435,6 +435,8 @@ public:
 	bool GetEyeFindScanCheckCond() { return m_bEyeFindCheckCond; }
 	bool m_bEyeFindSaveMask;
 	bool GetEyeFindScanSaveMask() { return m_bEyeFindSaveMask; }
+	bool m_bEyeFindViewSPAll;
+	bool GetEyeFindScanViewSPAll() { return m_bEyeFindViewSPAll; }
 	bool m_bEyeFindSaveSpecular;
 	bool GetEyeFindScanSaveSpecular() { return m_bEyeFindSaveSpecular; }
 	int m_nEyeDistRoiDimension;
@@ -460,11 +462,12 @@ public:
 	void FindSpecular(unsigned char* dest, int row, int col, unsigned char nThreshold, RECT& rtRet, int& nPixelCnt);
 	void UpdateRoiRect(RECT& rtRet, int row, int col, int& nPixelCnt);
 	int MaskingChunkFromBuf(unsigned char* pBufSrc, unsigned char* pBufDest, int nRowStart, int nRowEnd, int nColStart, int nColEnd, int nThreshold, int nPixelContrast, int& nCntAll, int& nCntUpSide, int& nCntDnSide, bool bTimeLogging = false);
-	int FindSpecularCross(unsigned char* dest, int nRowFindStart, int nRowFindEnd, int nColFindStart, int nColFindEnd, int nBaseValue, std::vector<RECT>* pVecRoiSP, std::vector<RECT>* pVecRoiSPNot, int nResultAdded, bool bCheckCond, bool bTimeLogging = false);
-	bool CheckSpecularCond(RECT* pRt, bool bCondLogging = false);
+	int FindSpecularCross(unsigned char* dest, char* pszName, int nRowFindStart, int nRowFindEnd, int nColFindStart, int nColFindEnd, int nBaseValue, std::vector<RECT>* pVecRoiSP, std::vector<RECT>* pVecRoiSPNot, int nResultAdded, bool bCheckCond, FILE* fpLog, bool bTimeLogging = false);
+	bool CheckSpecularCond(RECT* pRt, TCHAR* pszName, FILE* fpLog, bool bCondLogging = false);
 	float CalculateDistance(unsigned char* src, RECT& rtROI, int nExcludeThreshold, bool bSaveDist, char* pszName, int nBaseValue, int nPixelContrast, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, bool bTimeLogging = false);
+	float CalculateDistanceAll(unsigned char* src, std::vector<RECT>* pVecRoi, int nExcludeThreshold, bool bSaveDist, char* pszName, int nBaseValue, int nPixelContrast, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, bool bTimeLogging = false);
 	void CopyRoiValueToClipboard(unsigned char** copyValue, int row, int col, bool bTimeLogging = false);
-	void CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn);
+	void CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, FILE* fpLog = NULL);
 	void CallEyeFindTestFile(char* pszFilePath);
 	/////////////////////////////////////////////////////////////////////////////
 };

@@ -35,6 +35,8 @@ void FUNCTION_NAME_IS(TCHAR* pszFuncName);
 void LOG_INIT(HANDLE hInstance);
 void LOG_PUTS(short nLogLevel, TCHAR* pszLogMsg);
 void LOG_PRINTF(TCHAR _nLogLevel, TCHAR* pszFormat, ...);
+FILE* LOG_PUTS_FP(short nLogLevel, FILE* fpParam, TCHAR* pszLogMsg);
+FILE* LOG_PRINTF_FP(TCHAR _nLogLevel, FILE* fpParam, TCHAR* pszFormat, ...);
 
 void CheckDeleteLog();
 void DeleteOldLog(long lCurDate, TCHAR* pszFName, int nPos);
