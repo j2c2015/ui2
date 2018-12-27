@@ -143,7 +143,7 @@ BOOL Controller::stopCamera()
 			float fDeviation = k.fMaxDeviation;
 			int cx = (roiMax.left + roiMax.right) / 2;
 			int cy = (roiMax.top + roiMax.bottom) / 2;
-			_stprintf(szLogString, _T("[Name= %s] (Roi= %d,%d) Deviation= %0.5f"), pszName, cx, cy, fDeviation);
+			_stprintf(szLogString, _T("%s\t%d\t%d\t%0.5f"), pszName, cx, cy, fDeviation);
 
 			_ftprintf(fp, _T("%s\n"), szLogString);
 		}		
