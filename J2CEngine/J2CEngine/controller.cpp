@@ -20,6 +20,7 @@ std::vector<RECT> vecRoiSP;
 std::vector<RECT> vecRoiSPNot;
 int gEnrollIdx = 0;
 long long frameSequenceId = 0;
+std::vector<ROI_RESULT> vecRoiSPDeviation;
 
 void OnPnPEvent(BOOL bPlugIn)
 {
@@ -97,6 +98,9 @@ BOOL Controller::startCamera()
 	}
 	LOG_PRINTF(0, _T("IRIS start: %d"), bIrisStart);
 
+	// for print deviation value
+	vecRoiSPDeviation.clear();
+
 	return bIrisStart;
 }
 
@@ -113,6 +117,40 @@ BOOL Controller::stopCamera()
 		LOG_PUTS(0, _T("IRIS deinit."));
 	}	
 	LOG_PRINTF(0, _T("IRIS stop: %d"), bIrisStop);
+
+	// print deviation value
+	if (vecRoiSPDeviation.size() > 0)
+	{
+		std::this_thread::sleep_for(5s);
+		LOG_PRINTF(0, _T("Std-Deviation count= %d"), vecRoiSPDeviation.size());
+	}
+	_SYSTEMTIME	dt;
+	GetLocalTime(&dt);
+	TCHAR szDevResultPath[_MAX_PATH] = _T("");
+	_stprintf(szDevResultPath, _T("%s%s%04d%02d%02d_%02d%02d%s"),
+		g_szLogPath, _T("EyeTest_"),
+		dt.wYear, dt.wMonth, dt.wDay, dt.wHour, dt.wMinute, g_szLogExt);
+
+	FILE* fp = NULL;
+	long lFLen = 0;
+	if ((fp = _tfopen(szDevResultPath, _T("at"))) != NULL)
+	{
+		TCHAR szLogString[_MAX_PATH] = _T("");
+		for (auto &&k : vecRoiSPDeviation)
+		{
+			TCHAR* pszName = k.szName;
+			RECT roiMax = k.roi;
+			float fDeviation = k.fMaxDeviation;
+			int cx = (roiMax.left + roiMax.right) / 2;
+			int cy = (roiMax.top + roiMax.bottom) / 2;
+			_stprintf(szLogString, _T("[Name= %s] (Roi= %d,%d) Deviation= %0.5f"), pszName, cx, cy, fDeviation);
+
+			_ftprintf(fp, _T("%s\n"), szLogString);
+		}		
+		lFLen = ftell(fp);
+		fclose(fp);
+	}
+	vecRoiSPDeviation.clear();
 
 	return bIrisStop;
 }
@@ -720,6 +758,13 @@ int Controller::FindSpecularCross(unsigned char* dest, char* pszName, int nRowFi
 					dest[nIdxPixel] += 100;
 				} while (value == 1);
 
+				// line length check
+				distance = (nOffsetRight + nOffsetLeft) + 1;
+				if (distance < m_nEyeFindLineGroupMin || distance > m_nEyeFindLineGroupMax)
+				{
+					break;
+				}
+
 				if ((baseCol - nOffsetLeft) < rt.left)
 				{
 					rt.left = baseCol - nOffsetLeft;
@@ -728,14 +773,7 @@ int Controller::FindSpecularCross(unsigned char* dest, char* pszName, int nRowFi
 				{
 					rt.right = baseCol + nOffsetRight;
 				}
-
-				// line length check
-				distance = (nOffsetRight + nOffsetLeft) + 1;
-				if (distance < m_nEyeFindLineGroupMin || distance > m_nEyeFindLineGroupMax)
-				{
-					break;
-				}
-
+				
 				if (distance > 1)
 				{
 					baseCol = (baseCol - nOffsetLeft + (distance / 2));
@@ -933,10 +971,11 @@ float Controller::CalculateDistance(unsigned char* src, RECT& rtROI, int nExclud
 		//LOG_PRINTF(0, _T("Starting caculating distance. (Name= %s)"), pszName);
 		timeLogging.StartEllapsedTime();
 	}
-
+	
 	int nROIWidth = (rtROI.right - rtROI.left);
+	int nROIHeight = (rtROI.bottom - rtROI.top);
 	int nROICenterX = rtROI.left + (nROIWidth / 2);
-	int nROICenterY = rtROI.top + (nROIWidth / 2);
+	int nROICenterY = rtROI.top + (nROIHeight / 2);
 
 	roiDeviation.left = nROICenterX - nRoiDim;
 	roiDeviation.right = nROICenterX + nRoiDim;
@@ -1100,7 +1139,7 @@ float Controller::CalculateDistance(unsigned char* src, RECT& rtROI, int nExclud
 	return fStdDeviationSum;
 }
 
-float Controller::CalculateDistanceAll(unsigned char* src, std::vector<RECT>* pVecRoiSP, int nExcludeThreshold, bool bSaveDist, char* pszName, int nBaseValue, int nPixelContrast, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, bool bTimeLogging)
+float Controller::CalculateDistanceAll(unsigned char* src, std::vector<RECT>* pVecRoiSP, int nExcludeThreshold, bool bSaveDist, char* pszName, int nBaseValue, int nPixelContrast, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, RECT& rtRoiRet, bool bTimeLogging)
 {
 	int nRoiDim = (m_nEyeDistRoiDimension / 2);
 	int nRoiSample = m_nEyeDistRoiSample;
@@ -1280,6 +1319,8 @@ float Controller::CalculateDistanceAll(unsigned char* src, std::vector<RECT>* pV
 
 		imwrite(pathDist, srcDist);
 	}
+
+	rtRoiRet = rtRoiMax;
 	return fStdDeviationMax;
 }
 
@@ -1314,8 +1355,8 @@ void Controller::CallEyeFindTestFile(char* pszFilePath)
 
 		int nCntSPAll = 0, nCntSPUp = 0, nCntSPDn = 0;
 		FILE* fp = NULL;
-		if (m_bEyeFindViewSPAll)
-			fp = LOG_PRINTF_FP(0, NULL, _T(""));
+		//if (m_bEyeFindViewSPAll)
+		//	fp = LOG_PRINTF_FP(0, NULL, _T(""));
 		CallEyeFindTest(src, pszFName, nCntSPAll, nCntSPUp, nCntSPDn, fp);
 		if (fp)
 		{
@@ -1378,20 +1419,24 @@ void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPA
 			//
 		}
 
+		int nNameId = atoi(pszName);
+		TCHAR szName[10] = { 0, };
+		_stprintf(szName, _T("%d"), nNameId);
+
 		int nRoiCount = getController().FindSpecularCross(dest, pszName, nRowFindStart, nRowFindEnd, nColFindStart, nColFindEnd, nBaseValue, &vecRoiSP, &vecRoiSPNot, resultAdded, bCheckCond, fpLog, bTimeLogging);
 		if (nRoiCount <= 0)
 		{
-			int nNameId = atoi(pszName);
-			TCHAR szName[10] = { 0, };
-			_stprintf(szName, _T("%d"), nNameId);
 			LOG_PRINTF_FP(0, fpLog, _T("[Name= %s] ROI count = %d"), szName, nRoiCount);
 		}
 		else
 		{
+			float fDeviationMax = 0.0f;
+			RECT roiMax = { 0, };
+
 			// calculate all roi
 			if (m_bEyeFindViewSPAll)
 			{
-				float fDeviationMax = getController().CalculateDistanceAll(src, &vecRoiSP, nDistExcludeThreshold, bSaveDist, pszName, nBaseValue, nPixelContrast, nCntSPAll, nCntSPUp, nCntSPDn, bDistTimeLogging);
+				fDeviationMax = getController().CalculateDistanceAll(src, &vecRoiSP, nDistExcludeThreshold, bSaveDist, pszName, nBaseValue, nPixelContrast, nCntSPAll, nCntSPUp, nCntSPDn, roiMax, bDistTimeLogging);
 
 				// save mask
 				if (bSaveMask)
@@ -1418,10 +1463,7 @@ void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPA
 			else
 			{
 				bool bFindEye = false;
-
 				bool bSaveDistRoi = false;
-				float fDeviationMax = 0.0f;
-				RECT roiMax = { 0, };
 
 				bool bFirstRoi = true;
 				for (auto &&roi : vecRoiSP)
@@ -1483,6 +1525,11 @@ void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPA
 					float fDeviation = getController().CalculateDistance(src, rtROI, nDistExcludeThreshold, bSaveDist, pszName, nBaseValue, nPixelContrast, nCntSPAll, nCntSPUp, nCntSPDn, bDistTimeLogging);
 				}
 			}
+			ROI_RESULT result;
+			result.fMaxDeviation = fDeviationMax;
+			_tcscpy(result.szName, szName);
+			result.roi = roiMax;
+			vecRoiSPDeviation.push_back(result);
 		}
 
 		/*

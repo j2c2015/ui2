@@ -20,6 +20,7 @@ typedef void(__stdcall *J2CDebugOuputCb)(char *str);
 #define HEIGHT_IDENTIFY_EYE_VIEW	240
 
 J2CEngineDLL_API void initJ2CEngine(int nPartialWidth, int nPartialHeight);
+J2CEngineDLL_API void LoadJ2CConfiguration();
 J2CEngineDLL_API void registerRealTimeRenderCb(J2CRenderCb cb);
 J2CEngineDLL_API bool J2CStart();
 J2CEngineDLL_API bool J2CStop();

@@ -13,6 +13,12 @@ J2CEngineDLL_API void initJ2CEngine(int nPartialWidth, int nPartialHeight)
 	c.initEngine(nPartialWidth, nPartialHeight);
 }
 
+J2CEngineDLL_API void LoadJ2CConfiguration()
+{
+	Controller &c = getController();
+	c.LoadConfiguration();
+}
+
 J2CEngineDLL_API void registerRealTimeRenderCb(J2CRenderCb cb)
 {
 	Controller &c = getController();

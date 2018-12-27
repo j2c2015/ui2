@@ -21,6 +21,19 @@ static inline HINSTANCE& getCtrlInstance()
 }
 /////////////////////////////////////////////////////////////////////////////
 
+typedef struct _roi_result
+{
+	TCHAR szName[64];
+	RECT roi;
+	float fMaxDeviation;
+	_roi_result()
+	{
+		memset(szName, 0x00, sizeof(szName));
+		roi.left = roi.right = roi.top = roi.bottom = 0;
+		fMaxDeviation = 0.0f;
+	}
+} ROI_RESULT, *PROI_RESULT;
+
 enum Usage { IDLE_USAGE, ENROLL_USAGE, IDENTIFY_USAGE };
 class Controller {
 public:
@@ -465,7 +478,7 @@ public:
 	int FindSpecularCross(unsigned char* dest, char* pszName, int nRowFindStart, int nRowFindEnd, int nColFindStart, int nColFindEnd, int nBaseValue, std::vector<RECT>* pVecRoiSP, std::vector<RECT>* pVecRoiSPNot, int nResultAdded, bool bCheckCond, FILE* fpLog, bool bTimeLogging = false);
 	bool CheckSpecularCond(RECT* pRt, TCHAR* pszName, FILE* fpLog, bool bCondLogging = false);
 	float CalculateDistance(unsigned char* src, RECT& rtROI, int nExcludeThreshold, bool bSaveDist, char* pszName, int nBaseValue, int nPixelContrast, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, bool bTimeLogging = false);
-	float CalculateDistanceAll(unsigned char* src, std::vector<RECT>* pVecRoi, int nExcludeThreshold, bool bSaveDist, char* pszName, int nBaseValue, int nPixelContrast, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, bool bTimeLogging = false);
+	float CalculateDistanceAll(unsigned char* src, std::vector<RECT>* pVecRoi, int nExcludeThreshold, bool bSaveDist, char* pszName, int nBaseValue, int nPixelContrast, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, RECT& rtRoiRet, bool bTimeLogging = false);
 	void CopyRoiValueToClipboard(unsigned char** copyValue, int row, int col, bool bTimeLogging = false);
 	void CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, FILE* fpLog = NULL);
 	void CallEyeFindTestFile(char* pszFilePath);
@@ -482,3 +495,4 @@ extern int gFindSpecularIdx;
 extern std::vector<RECT> vecRoiSP;
 extern std::vector<RECT> vecRoiSPNot;
 extern int gEnrollIdx;
+extern std::vector<ROI_RESULT> vecRoiSPDeviation;

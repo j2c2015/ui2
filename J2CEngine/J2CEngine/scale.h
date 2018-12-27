@@ -52,8 +52,8 @@ public:
 			// cscho (2018-12.22)
 			//
 			FILE* fp = NULL;
-			if (getController().GetEyeFindScanViewSPAll())
-				fp = LOG_PRINTF_FP(0, NULL, _T(""));
+			//if (getController().GetEyeFindScanViewSPAll())
+			//	fp = LOG_PRINTF_FP(0, NULL, _T(""));
 			unsigned char* src = (unsigned char*)buf->getBuffer();
 			int nCntSPAll = 0, nCntSPUp = 0, nCntSPDn = 0;
 			getController().CallEyeFindTest(src, buf->getName(), nCntSPAll, nCntSPUp, nCntSPDn, fp);

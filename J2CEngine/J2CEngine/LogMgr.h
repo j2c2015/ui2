@@ -60,3 +60,7 @@ public:
 	double			GetEllapsedTime() { return m_fEllapsedTime; }
 };
 #pragma pack(pop)
+
+extern TCHAR	g_szLogPath[_MAX_PATH];
+extern TCHAR	g_szLogFName[_MAX_FNAME];
+extern TCHAR	g_szLogExt[_MAX_EXT];
