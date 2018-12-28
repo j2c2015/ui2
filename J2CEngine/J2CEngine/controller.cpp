@@ -21,6 +21,8 @@ std::vector<RECT> vecRoiSPNot;
 int gEnrollIdx = 0;
 long long frameSequenceId = 0;
 std::vector<ROI_RESULT> vecRoiSPDeviation;
+std::vector<ROI_RESULT> vecRoiSPCandidate;
+MultiCoreQueue gMultiCoreQueueForRoiSP;
 
 void OnPnPEvent(BOOL bPlugIn)
 {
@@ -273,6 +275,14 @@ void Controller::LoadConfiguration()
 	m_nEyeFindScanWidth = GetPrivateProfileInt(_T("EYEFIND"), _T("SCAN_WIDTH"), 800, m_szConfPath);
 	m_nEyeFindScanHeight = GetPrivateProfileInt(_T("EYEFIND"), _T("SCAN_HEIGHT"), 600, m_szConfPath);
 	m_nEyeFindThreshold = GetPrivateProfileInt(_T("EYEFIND"), _T("THRESHOLD"), 255, m_szConfPath);
+
+	m_bEyeFindPixelPctCheck = (bool)GetPrivateProfileInt(_T("EYEFIND"), _T("PIXEL_PCT_CHECK"), 1, m_szConfPath);
+	m_nEyeFindPixelPctMin = GetPrivateProfileInt(_T("EYEFIND"), _T("PIXEL_PCT_MIN"), 10, m_szConfPath);
+	m_nEyeFindPixelPctMax = GetPrivateProfileInt(_T("EYEFIND"), _T("PIXEL_PCT_MAX"), 60, m_szConfPath);
+
+	m_nEyeFindDevValueRef = GetPrivateProfileInt(_T("EYEFIND"), _T("DEV_VALUE_REF"), 100000, m_szConfPath);
+	m_nEyeFindDevValueGroupCnt = GetPrivateProfileInt(_T("EYEFIND"), _T("DEV_VALUE_GROUP"), 5, m_szConfPath);
+
 	m_nEyeFindScanBaseValue = GetPrivateProfileInt(_T("EYEFIND"), _T("BASE_VALUE"), 0, m_szConfPath);
 	m_nEyeFindResultAdded = GetPrivateProfileInt(_T("EYEFIND"), _T("RESULT_ADDED"), 0, m_szConfPath);
 	m_bEyeFindCheckCond = (bool)GetPrivateProfileInt(_T("EYEFIND"), _T("CHECK_COND"), 1, m_szConfPath);
@@ -852,16 +862,16 @@ bool Controller::CheckSpecularCond(RECT* pRt, TCHAR* pszName, FILE* fpLog, bool 
 	{
 		if (bCondLogging)
 			LOG_PRINTF(0, _T("%s Failed to pass condition. [Width= %d]"), szHdr, nWidth);
-		else if (fpLog)
-			LOG_PRINTF_FP(0, fpLog, _T("%s Failed to pass condition. [Width= %d]"), szHdr, nWidth);
+		//else if (fpLog)
+		//	LOG_PRINTF_FP(0, fpLog, _T("%s Failed to pass condition. [Width= %d]"), szHdr, nWidth);
 		return false;
 	}
 	if (nHeight < lineMin || nHeight > lineMax)
 	{
 		if (bCondLogging)
 			LOG_PRINTF(0, _T("%s Failed to pass condition. [Height= %d]"), szHdr, nHeight);
-		else if (fpLog)
-			LOG_PRINTF_FP(0, fpLog, _T("%s Failed to pass condition. [Height= %d]"), szHdr, nHeight);
+		//else if (fpLog)
+		//	LOG_PRINTF_FP(0, fpLog, _T("%s Failed to pass condition. [Height= %d]"), szHdr, nHeight);
 		return false;
 	}
 
@@ -873,8 +883,8 @@ bool Controller::CheckSpecularCond(RECT* pRt, TCHAR* pszName, FILE* fpLog, bool 
 	{
 		if (bCondLogging)
 			LOG_PRINTF(0, _T("%s Failed to pass condition. [Area= %d]"), szHdr, nArea);
-		else if (fpLog)
-			LOG_PRINTF_FP(0, fpLog, _T("%s Failed to pass condition. [Area= %d]"), szHdr, nArea);
+		//else if (fpLog)
+		//	LOG_PRINTF_FP(0, fpLog, _T("%s Failed to pass condition. [Area= %d]"), szHdr, nArea);
 		return false;
 	}
 
@@ -890,8 +900,8 @@ bool Controller::CheckSpecularCond(RECT* pRt, TCHAR* pszName, FILE* fpLog, bool 
 	{
 		if (bCondLogging)
 			LOG_PRINTF(0, _T("%s Failed to pass condition. [Ratio= %d]"), szHdr, (int)fRatio);
-		else if (fpLog)
-			LOG_PRINTF_FP(0, fpLog, _T("%s Failed to pass condition. [Ratio= %d]"), szHdr, (int)fRatio);
+		//else if (fpLog)
+		//	LOG_PRINTF_FP(0, fpLog, _T("%s Failed to pass condition. [Ratio= %d]"), szHdr, (int)fRatio);
 		return false;
 	}
 	
@@ -1027,6 +1037,7 @@ float Controller::CalculateDistance(unsigned char* src, RECT& rtROI, int nExclud
 			bool bExcludeThreshold = false;
 			double fSumValue = 0.0;
 			int nCntSum = 0;
+
 			for (int roiY = 0; roiY < nRoiSample; roiY++)
 			{
 				for (int roiX = 0; roiX < nRoiSample; roiX++)
@@ -1091,6 +1102,16 @@ float Controller::CalculateDistance(unsigned char* src, RECT& rtROI, int nExclud
 		LOG_PRINTF(0, _T("Finished caculating distance[Name= %5.5s]. (Deviation= %0.3f, Time= %0.5f)"), szName, fStdDeviationSum, fTimeDistance);
 	}
 
+	// in the standard deviation calculation, IF Ex > In * (3/4), then “this frame OMIT
+	bool bSampleOmit = false;
+	float fStdDeviationOmit = 0.0f;
+	if (nCntExclude > ((nCntInclude * 3) / 4))
+	{
+		bSampleOmit = true;
+		fStdDeviationOmit = fStdDeviationSum;
+		fStdDeviationSum = 0.0f;
+	}
+
 	// save distance
 	if (bSaveDist)
 	{
@@ -1105,7 +1126,10 @@ float Controller::CalculateDistance(unsigned char* src, RECT& rtROI, int nExclud
 		rectangle(srcDist, roiDev, Scalar(0, 255, 0), 1);
 
 		char szDeviation[64] = "";
-		sprintf(szDeviation, "[%d,%d]= %0.3f [In= %d, Ex= %d]", nROICenterX, nROICenterY, fStdDeviationSum, nCntInclude, nCntExclude);
+		if (bSampleOmit)
+			sprintf(szDeviation, "[%d,%d]= %0.3f [In= %d, Ex= %d] Omit", nROICenterX, nROICenterY, fStdDeviationOmit, nCntInclude, nCntExclude);
+		else
+			sprintf(szDeviation, "[%d,%d]= %0.3f [In= %d, Ex= %d]", nROICenterX, nROICenterY, fStdDeviationSum, nCntInclude, nCntExclude);
 		int baseLine = 0;
 		cv::Size szText = getTextSize(szDeviation, CV_FONT_HERSHEY_PLAIN, 1.0, 1, &baseLine);
 		cv::Rect roiText;
@@ -1136,6 +1160,7 @@ float Controller::CalculateDistance(unsigned char* src, RECT& rtROI, int nExclud
 
 		imwrite(pathDist, srcDist);
 	}
+
 	return fStdDeviationSum;
 }
 
@@ -1250,6 +1275,16 @@ float Controller::CalculateDistanceAll(unsigned char* src, std::vector<RECT>* pV
 				fStdDeviationSum += fStdDeviation;
 			}
 		}
+		// in the standard deviation calculation, IF Ex > In * (3/4), then “this frame OMIT
+		bool bSampleOmit = false;
+		float fStdDeviationOmit = 0.0f;
+		if (nCntExclude > ((nCntInclude * 3) / 4))
+		{
+			bSampleOmit = true;
+			fStdDeviationOmit = fStdDeviationSum;
+			fStdDeviationSum = 0.0f;
+		}
+
 		if (fStdDeviationSum > fStdDeviationMax)
 		{
 			fStdDeviationMax = fStdDeviationSum;
@@ -1277,7 +1312,10 @@ float Controller::CalculateDistanceAll(unsigned char* src, std::vector<RECT>* pV
 		rectangle(srcDist, roiSP, Scalar(255, 0, 0), 1);
 
 		char szDeviation[64] = "";
-		sprintf(szDeviation, "[%d,%d]= %0.3f [In= %d, Ex= %d]", nROICenterX, nROICenterY, fStdDeviationSum, nCntInclude, nCntExclude);
+		if (bSampleOmit)
+			sprintf(szDeviation, "[%d,%d]= %0.3f [In= %d, Ex= %d] Omit", nROICenterX, nROICenterY, fStdDeviationOmit, nCntInclude, nCntExclude);
+		else
+			sprintf(szDeviation, "[%d,%d]= %0.3f [In= %d, Ex= %d]", nROICenterX, nROICenterY, fStdDeviationSum, nCntInclude, nCntExclude);
 		int baseLine = 0;
 		cv::Size szText = getTextSize(szDeviation, CV_FONT_HERSHEY_PLAIN, 1.0, 1, &baseLine);
 		cv::Rect roiText;
@@ -1357,7 +1395,8 @@ void Controller::CallEyeFindTestFile(char* pszFilePath)
 		FILE* fp = NULL;
 		//if (m_bEyeFindViewSPAll)
 		//	fp = LOG_PRINTF_FP(0, NULL, _T(""));
-		CallEyeFindTest(src, pszFName, nCntSPAll, nCntSPUp, nCntSPDn, fp);
+		float fDeviationMax = 0.0f;
+		fDeviationMax = CallEyeFindTest(src, pszFName, nCntSPAll, nCntSPUp, nCntSPDn, NULL, fp);
 		if (fp)
 		{
 			fclose(fp);
@@ -1365,7 +1404,7 @@ void Controller::CallEyeFindTestFile(char* pszFilePath)
 	}
 }
 
-void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, FILE* fpLog)
+float Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, ROI_RESULT* pRoiResult, FILE* fpLog)
 {
 	int ScanHeight = GetEyeFindScanHeight();
 	int ScanWidth = GetEyeFindScanWidth();
@@ -1403,8 +1442,16 @@ void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPA
 		vecRoiSPNot.clear();
 	}
 
+	BOOL bCandidateOk = FALSE;
+	float fDeviationMax = 0.0f;
+	RECT roiMax = { 0, };
+
 	if (bufMask != nullptr && gFindSpecularIdx == 0)
 	{
+		int nNameId = atoi(pszName);
+		TCHAR szName[10] = { 0, };
+		_stprintf(szName, _T("%d"), nNameId);
+
 		unsigned char* dest = (unsigned char*)bufMask->getBuffer();
 		memset(dest, 0x00, FRAMESIZE_FOR_MASK_CROP);
 
@@ -1414,15 +1461,29 @@ void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPA
 		int nColEnd = WIDTH_FOR_CAMERA_CROP;
 		int nPixelContrast = 255;
 		int nBaseValue = getController().MaskingChunkFromBuf(src, dest, nRowStart, nRowEnd, nColStart, nColEnd, threshold, nPixelContrast, nCntSPAll, nCntSPUp, nCntSPDn, bTimeLogging);
+		// pixel pct. check
+		if (m_bEyeFindPixelPctCheck)
+		{
+			int nAllPixelCount = (WIDTH_FOR_CAMERA_CROP * HEIGHT_FOR_CAMERA_CROP);
+			float fPixelOkPct = (nCntSPAll * 100) / nAllPixelCount;
+			if (fPixelOkPct < m_nEyeFindPixelPctMin || fPixelOkPct > m_nEyeFindPixelPctMax)
+			{
+				LOG_PRINTF_FP(0, fpLog, _T("[Name= %s] Pixel count Pct. = %0.1f"), szName, fPixelOkPct);
+				// too close or too far
+				blinkingRedColorLedOn(500);
+				return 0.0f;
+			}
+			else
+			{
+				yellowColorLedOn();
+			}
+		}
+
 		if (nBaseValue > 1)
 		{
 			//
 		}
-
-		int nNameId = atoi(pszName);
-		TCHAR szName[10] = { 0, };
-		_stprintf(szName, _T("%d"), nNameId);
-
+		
 		int nRoiCount = getController().FindSpecularCross(dest, pszName, nRowFindStart, nRowFindEnd, nColFindStart, nColFindEnd, nBaseValue, &vecRoiSP, &vecRoiSPNot, resultAdded, bCheckCond, fpLog, bTimeLogging);
 		if (nRoiCount <= 0)
 		{
@@ -1430,9 +1491,6 @@ void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPA
 		}
 		else
 		{
-			float fDeviationMax = 0.0f;
-			RECT roiMax = { 0, };
-
 			// calculate all roi
 			if (m_bEyeFindViewSPAll)
 			{
@@ -1525,114 +1583,19 @@ void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPA
 					float fDeviation = getController().CalculateDistance(src, rtROI, nDistExcludeThreshold, bSaveDist, pszName, nBaseValue, nPixelContrast, nCntSPAll, nCntSPUp, nCntSPDn, bDistTimeLogging);
 				}
 			}
-			ROI_RESULT result;
-			result.fMaxDeviation = fDeviationMax;
-			_tcscpy(result.szName, szName);
-			result.roi = roiMax;
-			vecRoiSPDeviation.push_back(result);
+			if (fDeviationMax > 0.0f)
+			{
+				//ROI_RESULT result;
+				if (pRoiResult)
+				{
+					pRoiResult->fMaxDeviation = fDeviationMax;
+					_tcscpy(pRoiResult->szName, szName);
+					pRoiResult->roi = roiMax;
+					vecRoiSPDeviation.push_back(*pRoiResult);
+				}
+			}
 		}
-
-		/*
-		//
-		// find specular
-		//
-		std::vector<RECT> vecRoiAll;
-
-		//int* test = (int*)bufTest->getBuffer();
-		//memset(test, 0x00, FRAMESIZE_FOR_CAMERA_CROP);
-
-		int nCheckValue = 0;
-		int nRecurseCnt = 0;
-		int nPixelCnt = 0;
-		for (int row = (rowStart + 1); row < (HEIGHT_FOR_CAMERA_CROP - rowStart - 1); row++)
-		{
-		for (int col = (colStart + 1); col < (WIDTH_FOR_CAMERA_CROP - colStart - 1); col++)
-		{
-		nCheckValue++;
-
-		if (vecRoiAll.size() > 0)
-		{
-		bool bExistPos = false;
-		for (auto &&roi : vecRoiAll)
-		{
-		RECT rt = roi;
-		rt.left -= 1;
-		rt.top -= 1;
-		rt.right += 1;
-		rt.bottom += 1;
-		POINT pt = { col, row };
-		if (::PtInRect(&rt, pt))
-		{
-		bExistPos = true;
-		col = rt.right;
-		break;
-		}
-		}
-		if (bExistPos)
-		{
-		continue;
-		}
-		}
-
-		//
-		// find specular
-		//
-		nRecurseCnt = 0;
-		nPixelCnt = 0;
-		RECT rtSP = { 0, };
-		getController().FindSpecular(dest, row, col, threshold, rtSP, nPixelCnt);
-		//getController().FindSpecularRecurse(dest, row, col, threshold, test, rtSP, nCheckValue, nPixelCnt, nRecurseCnt);
-		if (::IsRectEmpty(&rtSP) == FALSE)
-		{
-		vecRoiAll.push_back(rtSP);
-
-		int width = rtSP.right - rtSP.left;
-		int height = rtSP.bottom - rtSP.top;
-		int area = (width * height);
-		float ratio = 0.0f;
-		if (width > height)
-		{
-		ratio = ((float)height / (float)width);
-		}
-		else
-		{
-		ratio = ((float)width / (float)height);
-		}
-		ratio *= 100;
-
-		if ((width > lineMin && height > lineMin) &&
-		(width < lineMax && height < lineMax) &&
-		(area > areaMin && area < areaMax) &&
-		(ratio >= ratioMin))
-		{
-		bool bIntersect = false;
-		if (vecRoiSP.size() > 0)
-		{
-		std::vector<RECT>::iterator iVec = vecRoiSP.begin();
-		for ( ; iVec != vecRoiSP.end(); iVec++)
-		{
-		RECT roi = *iVec;
-		RECT rtIntersect = { 0, };
-		if (::IntersectRect(&rtIntersect, &roi, &rtSP))
-		{
-		::UnionRect(&rtIntersect, &roi, &rtSP);
-		vecRoiSP.erase(iVec);
-		vecRoiSP.push_back(rtIntersect);
-		bIntersect = true;
-		break;
-		}
-		}
-		}
-		if (!bIntersect)
-		{
-		vecRoiSP.push_back(rtSP);
-		}
-		}
-		}
-		}
-		}
-		*/
-
+		
 		if (vecRoiSP.size() > 0)
 		{
 			//FUNCTION_NAME_IS(_T("Scaler::__internalJob"));
@@ -1656,4 +1619,148 @@ void Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPA
 		bufMask = nullptr;
 		bufTest = nullptr;
 	}
+	return fDeviationMax;
+}
+
+void Controller::allIndicationLedOff()
+{
+	BOOL bSuccess = FALSE;
+
+	COMPLEX_GPIO_PARAM ComplexGpioParam = { 0, };
+
+	ComplexGpioParam.BlinkingTime = INDICATE_LED_OFF;
+	ComplexGpioParam.Period = 0;
+	ComplexGpioParam.ThresHold = 0;
+
+	bSuccess = bJ2CIris_SetComplexGPIO(handle, GPIO_R, &ComplexGpioParam);
+	bSuccess = bJ2CIris_SetComplexGPIO(handle, GPIO_G, &ComplexGpioParam);
+	bSuccess = bJ2CIris_SetComplexGPIO(handle, GPIO_B, &ComplexGpioParam);
+}
+
+void Controller::redColorLedOn()
+{
+	BOOL bSuccess = FALSE;
+	if (m_eLEDBState != eLED_RED)
+	{
+		m_eLEDBState = eLED_RED;
+
+		allIndicationLedOff();
+
+		COMPLEX_GPIO_PARAM ComplexGpioParam = { 0, };
+
+		ComplexGpioParam.BlinkingTime = INDICATE_LED_ON;
+		ComplexGpioParam.Period = 1;
+		ComplexGpioParam.ThresHold = 1;
+
+		bSuccess = bJ2CIris_SetComplexGPIO(handle, GPIO_R, &ComplexGpioParam);
+	}
+}
+
+void Controller::blueColorLedOn()
+{
+	BOOL bSuccess = FALSE;
+	if (m_eLEDBState != eLED_BLUE)
+	{
+		m_eLEDBState = eLED_BLUE;
+
+		allIndicationLedOff();
+
+		COMPLEX_GPIO_PARAM ComplexGpioParam = { 0, };
+
+		ComplexGpioParam.BlinkingTime = INDICATE_LED_ON;
+		ComplexGpioParam.Period = 1;
+		ComplexGpioParam.ThresHold = 1;
+
+		bSuccess = bJ2CIris_SetComplexGPIO(handle, GPIO_B, &ComplexGpioParam);
+	}
+}
+
+void Controller::greenColorLedOn()
+{
+	BOOL bSuccess = FALSE;
+	if (m_eLEDBState != eLED_GREEN)
+	{
+		m_eLEDBState = eLED_GREEN;
+
+		allIndicationLedOff();
+
+		COMPLEX_GPIO_PARAM ComplexGpioParam = { 0, };
+
+		ComplexGpioParam.BlinkingTime = INDICATE_LED_ON;
+		ComplexGpioParam.Period = 1;
+		ComplexGpioParam.ThresHold = 1;
+
+		bSuccess = bJ2CIris_SetComplexGPIO(handle, GPIO_G, &ComplexGpioParam);
+	}
+}
+
+void Controller::yellowColorLedOn()
+{
+	BOOL bSuccess = FALSE;
+	if (m_eLEDBState != eLED_YELLOW)
+	{
+		m_eLEDBState = eLED_YELLOW;
+
+		allIndicationLedOff();
+
+		COMPLEX_GPIO_PARAM rComplexGpioParam = { 0, };
+		COMPLEX_GPIO_PARAM gComplexGpioParam = { 0, };
+
+		rComplexGpioParam.BlinkingTime = INDICATE_LED_ON;
+		rComplexGpioParam.Period = CY_FX_PWM_PERIOD;
+		rComplexGpioParam.ThresHold = CY_FX_PWM_PERIOD;
+
+		gComplexGpioParam.BlinkingTime = INDICATE_LED_ON;
+		gComplexGpioParam.Period = CY_FX_PWM_PERIOD;
+		gComplexGpioParam.ThresHold = CY_FX_PWM_HOLD_A0;
+
+		bSuccess = bJ2CIris_SetComplexGPIO(handle, GPIO_R, &rComplexGpioParam);
+		bSuccess = bJ2CIris_SetComplexGPIO(handle, GPIO_G, &gComplexGpioParam);
+	}
+}
+
+void Controller::blinkingRedColorLedOn(int value)
+{
+	BOOL bSuccess = FALSE;
+	if (m_eLEDBState != eLED_BLINKING)
+	{
+		m_eLEDBState = eLED_BLINKING;
+
+		allIndicationLedOff();
+
+		COMPLEX_GPIO_PARAM ComplexGpioParam = { 0, };
+
+		ComplexGpioParam.BlinkingTime = value; //ms
+		ComplexGpioParam.Period = CY_FX_PWM_PERIOD;
+		ComplexGpioParam.ThresHold = CY_FX_PWM_PERIOD;
+
+		bSuccess = bJ2CIris_SetComplexGPIO(handle, GPIO_R, &ComplexGpioParam);
+	}
+}
+
+void Controller::setSimpleGPIO(BYTE port, BOOL value)
+{
+	BOOL bSuccess = FALSE;
+	bSuccess = bJ2CIris_SetSimpleGPIO(handle, port, value);
+}
+
+bool Controller::getSimpleGPIO(BYTE port, BOOL* pbValue)
+{
+	BOOL bSuccess = FALSE;
+	bSuccess = bJ2CIris_GetSimpleGPIO(handle, port, pbValue);
+	return bSuccess;
+}
+
+void Controller::setI2C(BYTE slaveAddress, BOOL regAddrHigh_true, UINT RegAddr, UINT dataLength, char* data)
+{
+	BOOL bSuccess = FALSE;
+	// regAddrHigh_true = 2byte, if 1 byte, false
+	bSuccess = bJ2CIris_SetI2C(handle, slaveAddress, regAddrHigh_true, RegAddr, dataLength, (void*)data);
+}
+
+bool Controller::getI2C(BYTE slaveAddress, BOOL regAddrHigh_true, UINT RegAddr, UINT dataLength, char* pbValue)
+{
+	BOOL bSuccess = FALSE;
+	bSuccess = bJ2CIris_GetI2C(handle, slaveAddress, regAddrHigh_true, RegAddr, dataLength, (void*)pbValue);
+	return bSuccess;
 }

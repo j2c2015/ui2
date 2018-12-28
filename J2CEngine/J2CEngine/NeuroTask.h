@@ -240,6 +240,7 @@ public:
 			command = neuroShared.command;
 			if (command >= 0)
 			{
+				/************************************/
 				/*
 				if (command == ENROLL_END)
 				{
@@ -255,6 +256,7 @@ public:
 					bRet = __match(buf);
 				}
 				*/
+				/************************************/
 				switch (command)
 				{
 				case NEURO_ENROLL_COMMAND:

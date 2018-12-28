@@ -11,6 +11,9 @@
 #include <string>
 #include "colorbufferinfo.h"
 #include <iostream>
+
+extern int gTestBufId[5];
+
 //namespace J2C {
 class BufferPool
 {
@@ -156,6 +159,21 @@ public:
 		std::lock_guard<std::mutex> lock(queueLock_);
 		//if (poolId_ == CAMERA_CROP_BUFFER_POOL_ID)
 		//	std::cout << "Cameraframe dealloc " << buffer->getName() << std::endl;
+		/************************************************/
+		/*
+		if (buffer->poolId_ == CAMERA_CROP_BUFFER_POOL_ID)
+		{
+			int nId = atoi(buffer->getName());
+			for (int i = 0; i < 5; i++)
+			{
+				if (nId > 0 && nId == gTestBufId[i])
+				{
+					//
+				}
+			}
+		}
+		*/
+		/************************************************/
 		queue_.push(buffer);
 
 	}
@@ -214,5 +232,6 @@ public:
 	int size_;
 	int poolId_;
 };
+
 //}
 #endif // BUFFERPOOL_H

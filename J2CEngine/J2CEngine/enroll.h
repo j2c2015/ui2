@@ -52,7 +52,6 @@ public:
 				neuro.setCurrentEnrollName(buf.id);
 				neuro.enrollStart();
 				neuro.pushBufferToJobQueue(resized, NEURO_ENROLL_COMMAND);
-
 					
 #if NETWORK_ENROLL
 				std::cout << "Send enroll image to neurotechnology server" << std::endl;
@@ -68,10 +67,16 @@ public:
 			}
 			else
 			{
-				int a = 0;
+				//
 			}
-			getBufferPoolManager().deleteBufferWithName(CAMERA_CROP_BUFFER_POOL_ID, buf.cropSharedBuffer->getName());
-			getBufferPoolManager().deleteBufferWithName(OPENCV_BUFFER_POOL_ID, buf.opencvSharedBuffer->getName());
+			if (buf.cropSharedBuffer)
+			{
+				getBufferPoolManager().deleteBufferWithName(CAMERA_CROP_BUFFER_POOL_ID, buf.cropSharedBuffer->getName());
+			}
+			if (buf.opencvSharedBuffer)
+			{
+				getBufferPoolManager().deleteBufferWithName(OPENCV_BUFFER_POOL_ID, buf.opencvSharedBuffer->getName());
+			}
 			buf.cropSharedBuffer = nullptr;
 			buf.opencvSharedBuffer = nullptr;
 		}

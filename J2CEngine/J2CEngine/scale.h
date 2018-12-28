@@ -52,38 +52,69 @@ public:
 			// cscho (2018-12.22)
 			//
 			FILE* fp = NULL;
-			//if (getController().GetEyeFindScanViewSPAll())
-			//	fp = LOG_PRINTF_FP(0, NULL, _T(""));
+			if (getController().GetEyeFindScanViewSPAll())
+				fp = LOG_PRINTF_FP(0, NULL, _T(""));
 			unsigned char* src = (unsigned char*)buf->getBuffer();
 			int nCntSPAll = 0, nCntSPUp = 0, nCntSPDn = 0;
-			getController().CallEyeFindTest(src, buf->getName(), nCntSPAll, nCntSPUp, nCntSPDn, fp);
+			
+			{
+				ROI_RESULT roiResult;
+				float fDeviationMax = getController().CallEyeFindTest(src, buf->getName(), nCntSPAll, nCntSPUp, nCntSPDn, &roiResult, fp);
+				if (fDeviationMax >= getController().GetEyeFindDevValueRef())
+				{
+					int size = vecRoiSPCandidate.size();
+					if (size < 5)
+					{
+						gTestBufId[size] = atoi(buf->getName());
+					}
+					roiResult.enrollSharedBuffer = buf;
+					vecRoiSPCandidate.push_back(roiResult);
+				}
+			}
+			if (vecRoiSPCandidate.size() >= getController().GetEyeFindDevValueGroupCnt())
+			{
+				std::sort(vecRoiSPCandidate.begin(), vecRoiSPCandidate.end(), sortByRoiDeviation);
+			}
 			if (fp)
 			{
 				fclose(fp);
 			}
 
-			if (vecRoiSP.size() > 0)
+			if (vecRoiSPCandidate.size() >= getController().GetEyeFindDevValueGroupCnt())
 			{
-				if (vecRoiSP.size() == 1)
+				ROI_RESULT& candidate = vecRoiSPCandidate.back();
 				{
 					if (getController().GetEyeFindUseOpenCV() == false)
 					{
 						gEnrollIdx++;
 						//if (gEnrollIdx % 15 == 0)
 						{
+							/****************************************************/
+							/*
 							RECT rt = vecRoiSP.at(0);
 							int cx = (rt.left + rt.right) / 2;
 							int cy = (rt.top + rt.bottom) / 2;
 							EnrollSharedBuffer enroll;
 							enroll.id = buf->getName();
-							enroll.opencvSharedBuffer = buf;
-							enroll.cropSharedBuffer = buf;
+							enroll.opencvSharedBuffer = nullptr;
+							enroll.cropSharedBuffer = candidate.enrollSharedBuffer;
 							enroll.x = cx;
 							enroll.y = cy;
 							getEnrollMultiCoreQueue().putSharedBuffer(enroll);
 							gEnrollIdx = 0;
+							
+							J2CRenderCb render = getController().getEnrollRenderCb();
+							render(buf->getBuffer(), WIDTH_FOR_CAMERA_CROP, HEIGHT_FOR_CAMERA_CROP, COLOR_DEPTH_FOR_CAMERA_CROP);
+							*/
+							/****************************************************/
+
+							char pathEnroll[256] = "";
+							sprintf(pathEnroll, "c:\\jtwoc\\eyetest\\test_enroll_%s.png", candidate.enrollSharedBuffer->getName());
+							std::string strEnrollPath = pathEnroll;
+							getImageSaver().saveGrayImage(candidate.enrollSharedBuffer, strEnrollPath, WIDTH_FOR_CAMERA_CROP, HEIGHT_FOR_CAMERA_CROP);
 						}
 					}
+					vecRoiSPCandidate.clear();
 				}
 				for (auto &&roi : vecRoiSP)
 				{

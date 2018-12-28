@@ -6,9 +6,22 @@
 #include "NeuroTask.h"
 #include <opencv/cv.h>
 
-#define DEVICE_ID_LEN 10
-#define PARITAL_WIDTH	64
-#define PARTIAL_HEIGHT	64
+#define DEVICE_ID_LEN				(10)
+#define PARITAL_WIDTH				(64)
+#define PARTIAL_HEIGHT				(64)
+
+#define INDICATE_LED_NOBLINKING		(unsigned int)(0xFFFFFFFF)
+#define INDICATE_LED_ON				(unsigned int)(0x00000001)
+#define INDICATE_LED_OFF			(unsigned int)(0x00000000)
+#define CY_FX_PWM_PERIOD            (201600 - 1)  /* PWM time period. */
+#define CY_FX_PWM_HOLD_A0			(130446)  /* A0% of PWM time period. */
+
+#define GPIO_VSYNC					(17)
+#define GPIO_B                      (18)
+#define GPIO_G                      (19)
+#define GPIO_R                      (20)
+#define GPIO_850                    (21)
+#define GPIO_730                    (22)
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -26,13 +39,25 @@ typedef struct _roi_result
 	TCHAR szName[64];
 	RECT roi;
 	float fMaxDeviation;
+	SharedBuffer enrollSharedBuffer;
 	_roi_result()
 	{
 		memset(szName, 0x00, sizeof(szName));
 		roi.left = roi.right = roi.top = roi.bottom = 0;
 		fMaxDeviation = 0.0f;
+		enrollSharedBuffer = nullptr;
 	}
 } ROI_RESULT, *PROI_RESULT;
+
+typedef enum _led_state
+{
+	eLED_NONE,
+	eLED_BLINKING,
+	eLED_RED,
+	eLED_BLUE,
+	eLED_GREEN,
+	eLED_YELLOW,
+} eLED_STATE;
 
 enum Usage { IDLE_USAGE, ENROLL_USAGE, IDENTIFY_USAGE };
 class Controller {
@@ -47,6 +72,7 @@ public:
 		usage_ = IDLE_USAGE;
 		enrollId_ = "test";
 		blockTime_ = 0;
+		m_eLEDBState = eLED_NONE;
 	}
 	~Controller()
 	{
@@ -88,6 +114,16 @@ public:
 	BOOL stopCamera();
 	BOOL CheckIrisDevOpen();
 
+	void allIndicationLedOff();
+	void redColorLedOn();
+	void blueColorLedOn();
+	void greenColorLedOn();
+	void yellowColorLedOn();
+	void blinkingRedColorLedOn(int value);	
+	void setSimpleGPIO(BYTE port, BOOL value);
+	bool getSimpleGPIO(BYTE port, BOOL* pbValue);
+	void setI2C(BYTE slaveAddress, BOOL regAddrHigh_true, UINT RegAddr, UINT dataLength, char* data);
+	bool getI2C(BYTE slaveAddress, BOOL regAddrHigh_true, UINT RegAddr, UINT dataLength, char* pbValue);
 
 	J2CRenderCb realTimeRenderCb_ = [](void *, int, int, int) {};
 	void setRealTimeRenderCb(J2CRenderCb cb)
@@ -422,6 +458,19 @@ public:
 	int GetEyeFindScanThreshold() { return m_nEyeFindThreshold; }
 	int GetEyeFindScanAreaMin() { return m_nEyeFindAreaMin; }
 	int GetEyeFindScanAreaMax() { return m_nEyeFindAreaMax; }
+	eLED_STATE m_eLEDBState;
+	eLED_STATE GetLEDState() { return m_eLEDBState; }
+	void SetLEDState(eLED_STATE eLEDState) { m_eLEDBState = eLEDState; }
+	bool m_bEyeFindPixelPctCheck;
+	bool GetEyeFindPixelPctCheck() { return m_bEyeFindPixelPctCheck; }
+	int m_nEyeFindPixelPctMin;
+	int GetEyeFindPixelPctMin() { return m_nEyeFindPixelPctMin; }
+	int m_nEyeFindPixelPctMax;
+	int GetEyeFindPixelPctMax() { return m_nEyeFindPixelPctMax; }
+	int m_nEyeFindDevValueRef;
+	int GetEyeFindDevValueRef() { return m_nEyeFindDevValueRef; }
+	int m_nEyeFindDevValueGroupCnt;
+	int GetEyeFindDevValueGroupCnt() { return m_nEyeFindDevValueGroupCnt; }
 	int m_nEyeFindResultAdded;
 	int GetEyeFindScanResultAdded() { return m_nEyeFindResultAdded; }
 	int m_nEyeFindScanBaseValue;
@@ -480,7 +529,7 @@ public:
 	float CalculateDistance(unsigned char* src, RECT& rtROI, int nExcludeThreshold, bool bSaveDist, char* pszName, int nBaseValue, int nPixelContrast, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, bool bTimeLogging = false);
 	float CalculateDistanceAll(unsigned char* src, std::vector<RECT>* pVecRoi, int nExcludeThreshold, bool bSaveDist, char* pszName, int nBaseValue, int nPixelContrast, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, RECT& rtRoiRet, bool bTimeLogging = false);
 	void CopyRoiValueToClipboard(unsigned char** copyValue, int row, int col, bool bTimeLogging = false);
-	void CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, FILE* fpLog = NULL);
+	float CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSPAll, int& nCntSPUp, int& nCntSPDn, ROI_RESULT* pRoiResult, FILE* fpLog = NULL);
 	void CallEyeFindTestFile(char* pszFilePath);
 	/////////////////////////////////////////////////////////////////////////////
 };
@@ -491,8 +540,15 @@ static inline Controller &getController()
 	return gController;
 }
 
+static inline bool sortByRoiDeviation(const ROI_RESULT& lhs, const ROI_RESULT& rhs)
+{
+	return lhs.fMaxDeviation < rhs.fMaxDeviation;
+}
+
 extern int gFindSpecularIdx;
 extern std::vector<RECT> vecRoiSP;
 extern std::vector<RECT> vecRoiSPNot;
 extern int gEnrollIdx;
 extern std::vector<ROI_RESULT> vecRoiSPDeviation;
+extern std::vector<ROI_RESULT> vecRoiSPCandidate;
+extern MultiCoreQueue gMultiCoreQueueForRoiSP;

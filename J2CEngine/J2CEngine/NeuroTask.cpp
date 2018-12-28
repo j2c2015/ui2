@@ -64,7 +64,7 @@ void NeuroTask::__enroll(SharedBuffer &buf)
 	if (status == nbsOk)
 	{
 		std::cout << "Succes make template" << std::endl;
-		
+		getController().blueColorLedOn();
 	}
 	else
 	{
