@@ -162,6 +162,9 @@ BOOL Controller::testCamera()
 	BOOL bIrisTest = FALSE;
 	FUNCTION_NAME_IS(_T("Controller::testCamera"));
 
+	blinkingRedColorLedOn(500);
+	//yellowColorLedOn();
+
 	LOG_PRINTF(0, _T("IRIS test: %d"), bIrisTest);
 	return bIrisTest;
 }
@@ -1483,12 +1486,12 @@ float Controller::CallEyeFindTest(unsigned char* src, char* pszName, int& nCntSP
 			{
 				LOG_PRINTF_FP(0, fpLog, _T("[Name= %s] Pixel count Pct. = %0.1f"), szName, fPixelOkPct);
 				// too close or too far
-				blinkingRedColorLedOn(500);
+				//blinkingRedColorLedOn(500);
 				return 0.0f;
 			}
 			else
 			{
-				yellowColorLedOn();
+				//yellowColorLedOn();
 			}
 		}
 
