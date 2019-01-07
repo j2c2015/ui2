@@ -157,6 +157,15 @@ BOOL Controller::stopCamera()
 	return bIrisStop;
 }
 
+BOOL Controller::testCamera()
+{
+	BOOL bIrisTest = FALSE;
+	FUNCTION_NAME_IS(_T("Controller::testCamera"));
+
+	LOG_PRINTF(0, _T("IRIS test: %d"), bIrisTest);
+	return bIrisTest;
+}
+
 void Controller::initComponents()
 {
 	getScaler().startJob();
@@ -712,7 +721,7 @@ int Controller::FindSpecularCross(unsigned char* dest, char* pszName, int nRowFi
 			nIdxPixel = ((row * WIDTH_FOR_CAMERA_CROP) + col);
 			unsigned char value = dest[nIdxPixel];
 
-
+			
 			/////////////////////////////////////////////////////////////////////////////
 			// already check
 			if (value >= 100)
@@ -808,6 +817,10 @@ int Controller::FindSpecularCross(unsigned char* dest, char* pszName, int nRowFi
 				{
 					bool bCondLogging = GetEyeFindScanCondLogging();
 					bCondPass = CheckSpecularCond(&rt, szName, fpLog, bCondLogging);
+					if (rt.top > 446 && !bCondPass)
+					{
+						int a = 0;
+					}
 				}
 				if (bCondPass)
 				{

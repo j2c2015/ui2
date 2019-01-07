@@ -112,6 +112,7 @@ public:
 
 	BOOL startCamera();
 	BOOL stopCamera();
+	BOOL testCamera();
 	BOOL CheckIrisDevOpen();
 
 	void allIndicationLedOff();

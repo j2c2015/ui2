@@ -39,6 +39,13 @@ J2CEngineDLL_API bool J2CStop()
 	return bIrisStop;
 }
 
+J2CEngineDLL_API bool J2CTest()
+{
+	Controller &c = getController();
+	bool bIrisTest = c.testCamera();
+	return bIrisTest;
+}
+
 J2CEngineDLL_API bool J2CCheckDevOpen()
 {
 	Controller &c = getController();

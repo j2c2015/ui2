@@ -24,6 +24,7 @@ J2CEngineDLL_API void LoadJ2CConfiguration();
 J2CEngineDLL_API void registerRealTimeRenderCb(J2CRenderCb cb);
 J2CEngineDLL_API bool J2CStart();
 J2CEngineDLL_API bool J2CStop();
+J2CEngineDLL_API bool J2CTest();
 J2CEngineDLL_API bool J2CCheckDevOpen();
 J2CEngineDLL_API void enrollRequest(char *id, J2CEnrollCb cb);
 J2CEngineDLL_API void registerEnrollRenderCb(J2CRenderCb cb);
